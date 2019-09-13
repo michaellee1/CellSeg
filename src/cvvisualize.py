@@ -327,8 +327,13 @@ def generate_masks_and_save(path, image, masks,
         padded_mask = np.zeros(
             (mask.shape[0] + 2, mask.shape[1] + 2), dtype=np.uint8)
         padded_mask[1:-1, 1:-1] = mask
-        # contours = find_contours(padded_mask, 0.5)
-        im2, contours, hierarchy = cv2.findContours(padded_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+        major = cv2.__version__.split('.')[0]
+        contours = None
+        if major == '3':
+            _, contours, _ = cv2.findContours(padded_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        else:
+            contours, _ = cv2.findContours(padded_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(frame,contours,-1,255,1)
 
     imageio.imsave(path, frame)

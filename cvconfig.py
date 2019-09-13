@@ -29,23 +29,20 @@ class CVConfig():
     '''
     # Change these!
     target = '/media/TitanRAID/CHRISTIAN/COLLABORATIONS/XIANGYUE_ZHANG/20190613_6spleens_mc_processed'
-    # target = '/media/raid/michael/crc_images/_pooled_TMA_A_4and5_processed_backgroundsubtracted'
-    # target = '/media/raid/michael/tests/stitchTest'
 
     root = os.path.dirname(os.path.realpath(__file__))
 
     # target = 
     DIRECTORY_PATH = os.path.join(target, 'bestFocus')
-    # DIRECTORY_PATH = target
     CHANNEL_PATH = os.path.join(target, 'channelNames.txt')
     NUCLEAR_CHANNEL_NAME = 'DRAQ5'
     GROWTH_PIXELS = 0
     OUTPUT_METHOD = 'all'
-    BOOST = 11
+    BOOST = 5
 
     # Usually not changed
     MODEL_DIRECTORY = os.path.join(root, 'modelFiles')
-    MODEL_PATH = os.path.join(root, 'src/modelFiles', 'final_weights.h5')
+    MODEL_PATH = os.path.join(root, 'src', 'modelFiles', 'final_weights.h5')
     IMAGEJ_OUTPUT_PATH = os.path.join(root, 'output', 'imagej_files')
     QUANTIFICATION_OUTPUT_PATH = os.path.join(root, 'output', 'quantifications')
     VISUAL_OUTPUT_PATH = os.path.join(root, 'output', 'visual_output')
