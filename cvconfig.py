@@ -46,9 +46,9 @@ class CVConfig():
     # Usually not changed
     MODEL_DIRECTORY = os.path.join(root, 'modelFiles')
     MODEL_PATH = os.path.join(root, 'src/modelFiles', 'final_weights.h5')
-    IMAGEJ_OUTPUT_PATH = os.path.join(root, 'imagej_files')
-    QUANTIFICATION_OUTPUT_PATH = os.path.join(root, 'quantifications')
-    VISUAL_OUTPUT_PATH = os.path.join(root, 'visual_output')
+    IMAGEJ_OUTPUT_PATH = os.path.join(root, 'output', 'imagej_files')
+    QUANTIFICATION_OUTPUT_PATH = os.path.join(root, 'output', 'quantifications')
+    VISUAL_OUTPUT_PATH = os.path.join(root, 'output', 'visual_output')
     OVERLAP = 80
     INCREASE_FACTOR = 2.5
 
