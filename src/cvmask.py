@@ -105,38 +105,15 @@ class CVMask():
         start = timeit.default_timer()
         for i in range(N):
             mask = self.masks[:, :, i]
-
-            stop = timeit.default_timer()
-            print('Time First: ', stop - start) 
-
             coords = np.where(mask)
-
-            stop = timeit.default_timer()
-            print('Time: ', stop - start)
-
             minX, minY, maxX, maxY = self.bounding_box(coords[0], coords[1], Y-1, X-1, growth)
             self.bb_mins.append((minX, minY))
             self.bb_maxes.append((maxX, maxY))
-
-            stop = timeit.default_timer()
-            print('Time: ', stop - start)
-            
             centroid = self.get_centroid(coords[0], coords[1])
             self.centroids.append(centroid)
-
-            stop = timeit.default_timer()
-            print('Time: ', stop - start)
-            
             snippet = mask[minY:maxY,minX:maxX]
             new_snippet = self.expand_snippet(snippet, growth)
-
-            stop = timeit.default_timer()
-            print('Time: ', stop - start)
-            
             mask[minY:maxY,minX:maxX] = new_snippet
-
-            stop = timeit.default_timer()
-            print('Time: ', stop - start)
 
     def remove_overlaps_nearest_neighbors(self):
         Y, X, N = self.masks.shape
