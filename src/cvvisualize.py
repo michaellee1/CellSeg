@@ -1,3 +1,8 @@
+# cvvisualize.py
+# ---------------------------
+# Contains visualization helper functions.  Much of this file is not used during inference, but may be
+# helpful when debugging / extracting information from segmentations.
+
 import os
 import sys
 import logging

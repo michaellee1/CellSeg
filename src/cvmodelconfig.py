@@ -1,3 +1,8 @@
+# cvmodelconfig.py
+# ---------------------------
+# Configuration class for model.  See subclass below to set parameters.  Most parameters probably
+# should not be changed
+
 import math
 import numpy as np
 
@@ -214,7 +219,7 @@ class Config(object):
         print("\n")
 
 class CVSegmentationConfig(Config):
-    NAME = "CODEX Nuclear Stain Inference"
+    NAME = "Nuclear Stain Inference"
     IMAGE_RESIZE_MODE = "pad64"
     ZOOM = False
     ASPECT_RATIO = 1

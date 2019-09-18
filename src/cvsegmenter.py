@@ -1,3 +1,7 @@
+# cvsegmenter.py
+# ---------------------------
+# Contains the logic for cropping and segmentation.  See class doc for details.
+
 import os
 import numpy as np
 import warnings

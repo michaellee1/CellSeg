@@ -1,3 +1,7 @@
+# cvmask.py
+# ---------------------------
+# Wrapper class for masks.  See class doc for details.
+
 import numpy as np
 from scipy.spatial import distance
 from operator import itemgetter

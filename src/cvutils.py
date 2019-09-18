@@ -1,3 +1,8 @@
+# cvutils.py
+# ---------------------------
+# Contains general helper functions.  Much of this file is not used during inference, but may be
+# helpful for modification purposes.
+
 import sys
 import os
 import math

@@ -1,3 +1,7 @@
+# fcswrite.py
+# ---------------------------
+# Helper class to write to .fcs format
+
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """Write .fcs files for flow cytometry"""

@@ -38,7 +38,7 @@ class CVConfig():
     NUCLEAR_CHANNEL_NAME = 'DRAQ5'
     GROWTH_PIXELS = 0
     OUTPUT_METHOD = 'all'
-    BOOST = 5
+    BOOST = 11
 
     # Usually not changed
     MODEL_DIRECTORY = os.path.join(root, 'modelFiles')

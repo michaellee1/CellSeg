@@ -1,3 +1,11 @@
+# main.py
+# ---------------------------
+# main.py connects segmentation, stitching, and output into a single pipeline.  It prints metadata about
+# the run, and then initializes a segmenter and stitcher.  Looping over all image files in the directory,
+# each image is segmented, stitched, grown, and overlaps resolved.  The data is concatenated if outputting
+# as quantifications, and outputted per file for other output methods.  This file can be run by itself by
+# invoking python main.py or the main function imported.
+
 import os
 from src.cvsegmenter import CVSegmenter
 from src.cvstitch import CVMaskStitcher
@@ -11,50 +19,40 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-# -------------------
-# START
-# -------------------
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-cf = CVConfig()
-
-print('Initializing CVSegmenter at', cf.DIRECTORY_PATH)
-print('Picking channel', cf.NUCLEAR_CHANNEL_NAME, 'from',
-      len(cf.CHANNEL_NAMES), 'total to segment on')
-print('Channel names:')
-print(cf.CHANNEL_NAMES)
-print("Working with images of shape:", cf.SHAPE)
-
-stitcher = CVMaskStitcher(overlap=cf.OVERLAP)
-segmenter = CVSegmenter(
-    cf.SHAPE,
-    cf.MODEL_PATH,
-    cf.OVERLAP,
-    cf.INCREASE_FACTOR
-)
-# ------------------
-# HELPERS (Refactor)
-# ------------------
-
-def boost_image(image, boost_factor):
-    EIGHT_BIT_MAX = 255
-
-    max_mask = np.full(image.shape, EIGHT_BIT_MAX)
-    boosted = np.rint(np.minimum(
-        image * boost_factor, max_mask)).astype('uint8')
-    return skimage.img_as_ubyte(boosted)
-
-
-def get_channel_index(text):
-    if text not in cf.CHANNEL_NAMES:
-        raise NameError('Couldn\'t find {} channel'.format(text))
-
-    return np.where(cf.CHANNEL_NAMES == text)[0][0]
-
-# ---------------
-# OUTPUT HANDLING
-# ---------------
 def main():
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+    cf = CVConfig()
+
+    print('Initializing CVSegmenter at', cf.DIRECTORY_PATH)
+    print('Picking channel', cf.NUCLEAR_CHANNEL_NAME, 'from',
+        len(cf.CHANNEL_NAMES), 'total to segment on')
+    print('Channel names:')
+    print(cf.CHANNEL_NAMES)
+    print("Working with images of shape:", cf.SHAPE)
+
+    stitcher = CVMaskStitcher(overlap=cf.OVERLAP)
+    segmenter = CVSegmenter(
+        cf.SHAPE,
+        cf.MODEL_PATH,
+        cf.OVERLAP,
+        cf.INCREASE_FACTOR
+    )
+
+    def boost_image(image, boost_factor):
+        EIGHT_BIT_MAX = 255
+
+        max_mask = np.full(image.shape, EIGHT_BIT_MAX)
+        boosted = np.rint(np.minimum(
+            image * boost_factor, max_mask)).astype('uint8')
+        return skimage.img_as_ubyte(boosted)
+
+    def get_channel_index(text):
+        if text not in cf.CHANNEL_NAMES:
+            raise NameError('Couldn\'t find {} channel'.format(text))
+
+        return np.where(cf.CHANNEL_NAMES == text)[0][0]
+
     growth = cf.GROWTH_PIXELS
     rows, cols = None, None
     dataframe_list = []
@@ -146,4 +144,5 @@ def main():
         # Output to .fcs file
         fcswrite.write_fcs(path + '.fcs', columns, full_df_array)
 
-main()
+if __name__ == "__main__":
+    main()

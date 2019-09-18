@@ -1,3 +1,8 @@
+# cvmodel.py
+# ---------------------------
+# Mask R-CNN model file.  Much of this file is not used during inference, but is a good reference
+# for understanding the architecture.
+
 import os
 import random
 import datetime

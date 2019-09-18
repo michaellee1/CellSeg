@@ -1,6 +1,9 @@
+# cvstitch.py
+# ---------------------------
+# Contains the logic for stitching masks.  See class doc for details.
+
 import numpy as np
 import cv2
-
 
 class CVMaskStitcher():
     """
@@ -116,6 +119,7 @@ class CVMaskStitcher():
         
         return full_mask
 
+    # Remove any cells smaller than the defined threshold.
     def remove_small_cells(self, masks):
         i, j, n_masks = masks.shape
         channel_counts = np.zeros((n_masks + 1), dtype='uint16')
