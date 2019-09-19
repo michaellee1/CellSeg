@@ -39,20 +39,6 @@ def main():
         cf.INCREASE_FACTOR
     )
 
-    def boost_image(image, boost_factor):
-        EIGHT_BIT_MAX = 255
-
-        max_mask = np.full(image.shape, EIGHT_BIT_MAX)
-        boosted = np.rint(np.minimum(
-            image * boost_factor, max_mask)).astype('uint8')
-        return skimage.img_as_ubyte(boosted)
-
-    def get_channel_index(text):
-        if text not in cf.CHANNEL_NAMES:
-            raise NameError('Couldn\'t find {} channel'.format(text))
-
-        return np.where(cf.CHANNEL_NAMES == text)[0][0]
-
     growth = cf.GROWTH_PIXELS
     rows, cols = None, None
     dataframe_list = []
@@ -64,9 +50,9 @@ def main():
     for filename in cf.FILENAMES:
         path = os.path.join(cf.DIRECTORY_PATH, filename)
         image = skimage.external.tifffile.imread(path).reshape(cf.SHAPE)
-        nuclear_index = get_channel_index(cf.NUCLEAR_CHANNEL_NAME)
+        nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
         nuclear_image = np.expand_dims(skimage.img_as_ubyte(image)[nuclear_index], axis=2)
-        nuclear_image = boost_image(nuclear_image[:, :, [0, 0, 0]], cf.BOOST)
+        nuclear_image = cvutils.boost_image(nuclear_image[:, :, [0, 0, 0]], cf.BOOST)
 
         print('\nSegmenting with CellVision:', filename)
         masks, rows, cols = segmenter.segment_image(nuclear_image)

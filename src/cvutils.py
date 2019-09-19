@@ -23,6 +23,20 @@ COCO_MODEL_URL = "https://github.com/matterport/Mask_RCNN/releases/download/v2.0
 ############################################################
 #  Packaged Segmenter
 ############################################################
+def boost_image(image, boost_factor):
+    EIGHT_BIT_MAX = 255
+
+    max_mask = np.full(image.shape, EIGHT_BIT_MAX)
+    boosted = np.rint(np.minimum(
+        image * boost_factor, max_mask)).astype('uint8')
+    return skimage.img_as_ubyte(boosted)
+
+def get_channel_index(text, channel_names):
+    if text not in channel_names:
+        raise NameError('Couldn\'t find {} channel'.format(text))
+
+    return np.where(channel_names == text)[0][0]
+
 def extract_tile_information(filename):
     try:
         name = filename.split('.')[0]
