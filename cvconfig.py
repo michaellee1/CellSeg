@@ -1,4 +1,5 @@
 
+from PIL import Image
 import pandas as pd
 import skimage
 import os
@@ -8,8 +9,8 @@ class CVConfig():
     Define your constants below.
 
     DIRECTORY_PATH - directory that contains your .tif bestFocus images (usually the bestFocus folder)
-    CHANNEL_PATH - path to your channels file (usually called channelNames.txt)
-    NUCLEAR_CHANNEL_NAME - name of nuclear stain (corresponding to channelNames.txt).  Case sensitive.
+    CHANNEL_PATH - path to your channels file (usually called channelNames.txt). Only used for tif images with more than 3 channels, or 4D TIF images.
+    NUCLEAR_CHANNEL_NAME - name of nuclear stain (corresponding to channelNames.txt).  Case sensitive.  Only used for tif images with more than 3 channels, or 4D TIF images.
     GROWTH_PIXELS - number of pixels from which to grow out from the nucleus to define a cell boundary.  Change based on tissue types.
     OUTPUT_METHOD - (imagej_text_file, statistics, visual_image_output, visual_overlay_output, all)
     BOOST - multiplier with which to boost the pixels of the nuclear stain before inference
@@ -38,7 +39,7 @@ class CVConfig():
     NUCLEAR_CHANNEL_NAME = 'DRAQ5'
     GROWTH_PIXELS = 0
     OUTPUT_METHOD = 'all'
-    BOOST = 11
+    BOOST = 'auto'
 
     # Usually not changed
     MODEL_DIRECTORY = os.path.join(root, 'modelFiles')
@@ -54,17 +55,12 @@ class CVConfig():
         self.CHANNEL_NAMES = pd.read_csv(
             self.CHANNEL_PATH, sep='\t', header=None).values[:, 0]
 
+        VALID_IMAGE_EXTENSIONS = ('tif', 'jpg', 'png')
         self.FILENAMES = [f for f in os.listdir(self.DIRECTORY_PATH) if f.endswith(
-            '.tif') and not f.startswith('.')]
+            VALID_IMAGE_EXTENSIONS) and not f.startswith('.')]
         if len(self.FILENAMES) < 1:
             raise NameError(
-                'No tif files found.  Make sure you are pointing to the right directory')
+                'No image files found.  Make sure you are pointing to the right directory')
 
-        shape = skimage.external.tifffile.imread(
-            os.path.join(self.DIRECTORY_PATH, self.FILENAMES[0])).shape
-        print(shape)
-        if len(shape) < 4:
-            raise ValueError(
-                'Unexpected image shape.  CODEX images are cycles x channels x height x width.')
-        self.SHAPE = (shape[0] * shape[1], shape[2], shape[3])
-
+        self.N_DIMS, self.EXT, self.DTYPE, self.SHAPE, self.BOOST, self.READ_METHOD = cvutils.meta_from_image(os.path.join(
+            self.DIRECTORY_PATH, self.FILENAMES[0]), SELF.BOOST)

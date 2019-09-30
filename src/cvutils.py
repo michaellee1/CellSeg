@@ -50,6 +50,49 @@ def extract_tile_information(filename):
     except:
         raise NameError('Looks like at least one filename is not in the right format.  CODEX filenames look like \'reg002_X02_Y04_Z08.tif\'')
 
+# Assumes 2 or 3 dims
+def get_nuclear_image(n_dims, image, nuclear_index=None):
+    if n_dims == 2:
+        nuclear_image = np.expand_dims(skimage.img_as_ubyte(image), axis=2)
+
+    elif n_dims == 3:
+        if nuclear_index:
+            nuclear_image = np.expand_dims(skimage.img_as_ubyte(image)[nuclear_index], axis=2)
+        else:
+            if image.shape[2] == 3:
+                return image
+
+    nuclear_image = nuclear_image[:, :, [0, 0, 0]]
+    return nuclear_image
+    
+
+def meta_from_image(filename, boost):
+    EIGHT_BIT_MAX = 255
+    SIXTEEN_BIT_MAX = 65535
+
+    # get shape, file_ext, 8 vs 16 bit, boost,
+
+    ext = filename[-3:]
+    read_method = skimage.external.tifffile.imread if ext == 'tif' else Image.open
+    image = np.array(read_method(path))
+
+    shape = image.shape
+    n_dims = len(shape)
+        
+    if n_dims > 4 or n_dims < 2:
+        raise ValueError('Invalid image dimensions.  CellVision supports 4D cycle, 3D, and 2D images.')
+
+    if n_dims == 4:
+        # Convert to 3D
+        shape = (shape[0] * shape[1], shape[2], shape[3])
+
+    if boost == 'auto':
+        print('Using auto boosting - may be inaccurate for empty or noisy images.')
+        saturation_max = SIXTEEN_BIT_MAX if dtype == 'uint16' else EIGHT_BIT_MAX
+        image_max = np.max(image)
+        boost = saturation_max / image_max
+
+    return n_dims, ext, image.dtype, boost, read_method
 ############################################################
 #  Bounding Boxes
 ############################################################

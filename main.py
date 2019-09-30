@@ -49,10 +49,12 @@ def main():
 
     for filename in cf.FILENAMES:
         path = os.path.join(cf.DIRECTORY_PATH, filename)
-        image = skimage.external.tifffile.imread(path).reshape(cf.SHAPE)
-        nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
-        nuclear_image = np.expand_dims(skimage.img_as_ubyte(image)[nuclear_index], axis=2)
-        nuclear_image = cvutils.boost_image(nuclear_image[:, :, [0, 0, 0]], cf.BOOST)
+        image = cf.READ_METHOD.reshape(cf.SHAPE)
+        nuclear_index = None
+        if cf.N_DIMS == 4:
+            nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
+        nuclear_image = cvutils.get_nuclear_image(cf.N_DIMS, image, nuclear_index=nuclear_index)
+        nuclear_image = cvutils.boost_image(nuclear_image, cf.BOOST)
 
         print('\nSegmenting with CellVision:', filename)
         masks, rows, cols = segmenter.segment_image(nuclear_image)
