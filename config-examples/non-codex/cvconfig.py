@@ -1,4 +1,3 @@
-
 from src import cvutils
 from PIL import Image
 import pandas as pd
@@ -33,11 +32,9 @@ class CVConfig():
     scripter if we pick output to imagej_text_file
     '''
     # Change these!
-    IS_CODEX_OUTPUT = True
-    target = '/media/TitanRAID/CHRISTIAN/COLLABORATIONS/XIANGYUE_ZHANG/20190613_6spleens_mc_processed'
-    DIRECTORY_PATH = os.path.join(target, 'bestFocus')
-    CHANNEL_PATH = os.path.join(target, 'channelNames.txt')
-    NUCLEAR_CHANNEL_NAME = 'DRAQ5'
+    IS_CODEX_OUTPUT = False
+    target = '/media/raid/michael/CellVision/scripts/512x512/png_output/test'
+    DIRECTORY_PATH = os.path.join(target)
     GROWTH_PIXELS = 0
     OUTPUT_METHOD = 'all'
     BOOST = 'auto'
@@ -55,12 +52,13 @@ class CVConfig():
 
     # Probably don't change this, unless you are g0d.
     def __init__(self):
-        self.CHANNEL_NAMES = pd.read_csv(
-            self.CHANNEL_PATH, sep='\t', header=None).values[:, 0]
+        if self.IS_CODEX_OUTPUT:
+            self.CHANNEL_NAMES = pd.read_csv(
+                self.CHANNEL_PATH, sep='\t', header=None).values[:, 0]
 
         VALID_IMAGE_EXTENSIONS = ('tif', 'jpg', 'png')
         self.FILENAMES = [f for f in os.listdir(self.DIRECTORY_PATH) if f.endswith(
-            VALID_IMAGE_EXTENSIONS) and not f.startswith('.') and f.startswith('reg001_X01_Y02_Z05.tif')]
+            VALID_IMAGE_EXTENSIONS) and not f.startswith('.')]
         if len(self.FILENAMES) < 1:
             raise NameError(
                 'No image files found.  Make sure you are pointing to the right directory')

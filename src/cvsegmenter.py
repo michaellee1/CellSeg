@@ -39,13 +39,13 @@ class CVSegmenter:
     
     def get_model(self, model_path, increase_factor):
         print('Initializing model with weights located at', model_path)
-        if self.shape[1:3] not in IMAGE_GRID:
+        if self.shape[:2] not in IMAGE_GRID:
             print('Using autosizing for image shape')
-            self.nrows, self.ncols = int(np.ceil(self.shape[1] / AUTOSIZE_MAX_SIZE)), int(np.ceil(self.shape[2] / AUTOSIZE_MAX_SIZE))
+            self.nrows, self.ncols = int(np.ceil(self.shape[0] / AUTOSIZE_MAX_SIZE)), int(np.ceil(self.shape[1] / AUTOSIZE_MAX_SIZE))
         else:
-            self.nrows, self.ncols = IMAGE_GRID[self.shape[1:3]]
+            self.nrows, self.ncols = IMAGE_GRID[self.shape[:2]]
 
-        smallest_side = min(self.shape[1] // self.nrows, self.shape[2] // self.ncols) + self.overlap
+        smallest_side = min(self.shape[0] // self.nrows, self.shape[1] // self.ncols) + self.overlap
         inference_config = CVSegmentationConfig(smallest_side, increase_factor)
         model = modellib.MaskRCNN(mode="inference", 
                           config=inference_config)
