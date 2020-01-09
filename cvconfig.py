@@ -35,6 +35,7 @@ class CVConfig():
     # Change these!
     IS_CODEX_OUTPUT = True
     target = '/media/TitanRAID/CHRISTIAN/COLLABORATIONS/XIANGYUE_ZHANG/20190613_6spleens_mc_processed'
+    output_path_name = "12_30_19"
     DIRECTORY_PATH = os.path.join(target, 'bestFocus')
     CHANNEL_PATH = os.path.join(target, 'channelNames.txt')
     NUCLEAR_CHANNEL_NAME = 'DRAQ5'
@@ -46,21 +47,29 @@ class CVConfig():
     root = os.path.dirname(os.path.realpath(__file__))
     MODEL_DIRECTORY = os.path.join(root, 'modelFiles')
     MODEL_PATH = os.path.join(root, 'src', 'modelFiles', 'final_weights.h5')
-    IMAGEJ_OUTPUT_PATH = os.path.join(root, 'output', 'imagej_files')
-    QUANTIFICATION_OUTPUT_PATH = os.path.join(root, 'output', 'quantifications')
-    VISUAL_OUTPUT_PATH = os.path.join(root, 'output', 'visual_output')
+    IMAGEJ_OUTPUT_PATH = os.path.join(root, 'output', output_path_name, 'imagej_files')
+    QUANTIFICATION_OUTPUT_PATH = os.path.join(root, 'output', output_path_name,'quantifications')
+    VISUAL_OUTPUT_PATH = os.path.join(root, 'output', output_path_name,'visual_output')
+    try:
+        os.makedirs(IMAGEJ_OUTPUT_PATH)
+        os.makedirs(QUANTIFICATION_OUTPUT_PATH)
+        os.makedirs(VISUAL_OUTPUT_PATH)
+    except FileExistsError:
+        print("Directory already exists")
+        
     OVERLAP = 80
+    THRESHOLD = 20
     INCREASE_FACTOR = 2.5
     AUTOBOOST_PERCENTILE = 99.98
 
-    # Probably don't change this, unless you are g0d.
+    # Probably don't change this, except the valid image extensions when working with unique extensions.
     def __init__(self):
         self.CHANNEL_NAMES = pd.read_csv(
             self.CHANNEL_PATH, sep='\t', header=None).values[:, 0]
 
         VALID_IMAGE_EXTENSIONS = ('tif', 'jpg', 'png')
         self.FILENAMES = [f for f in os.listdir(self.DIRECTORY_PATH) if f.endswith(
-            VALID_IMAGE_EXTENSIONS) and not f.startswith('.') and f.startswith('reg001_X01_Y02_Z05.tif')]
+            VALID_IMAGE_EXTENSIONS) and not f.startswith('.')]
         if len(self.FILENAMES) < 1:
             raise NameError(
                 'No image files found.  Make sure you are pointing to the right directory')

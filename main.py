@@ -40,6 +40,7 @@ def main():
         cf.MODEL_PATH,
         cf.OVERLAP,
         cf.INCREASE_FACTOR
+        cf.THRESHOLD
     )
 
     growth = cf.GROWTH_PIXELS

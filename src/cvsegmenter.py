@@ -30,12 +30,13 @@ class CVSegmenter:
     have the same channels, and are being segmented on the same channel.  segment() returns a dictionary containing 
     all masks.  Currently does not return scores, class ids, or boxes, but can be modified to do so.
     """
-    def __init__(self, shape, model_path, overlap, increase_factor):
+    def __init__(self, shape, model_path, overlap, increase_factor, threshold):
         self.overlap = overlap
         self.shape = shape
         self.nrows = 0
         self.ncols = 0
         self.model = self.get_model(model_path, increase_factor)
+        self.threshold = threshold
     
     def get_model(self, model_path, increase_factor):
         print('Initializing model with weights located at', model_path)

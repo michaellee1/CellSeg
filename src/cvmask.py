@@ -46,7 +46,27 @@ class CVMask():
                     (x < x_len - 1 and snippet[y,x+1]): output[y,x] = True
             snippet = output.copy()
         return output
-
+    
+    
+    #expands masks taking into account where collisions will occur
+    @staticmethod
+    def new_expand_snippet(snippet, pixels, pixel_mask):
+        y_len,x_len = snippet.shape
+        output = snippet.copy()
+        for _ in range(pixels):
+            for y in range(y_len):
+                for x in range(x_len):
+                    if ~pixel_mask[y,x] and ((y > 0 and snippet[y-1,x]) or \
+                    (y < y_len - 1 and snippet[y+1,x]) or \
+                    (x > 0        and snippet[y,x-1]) or \
+                    (x < x_len - 1 and snippet[y,x+1])): output[y,x] = True
+                    if (y > 0 and snippet[y-1,x]): output[y-1,x] = True
+                    if (y < y_len - 1 and snippet[y+1,x]): output[y+1,x] = True
+                    if (x > 0 and snippet[y,x-1]): output[y,x-1] = True
+                    if (x < x_len - 1 and snippet[y,x+1]): output[y,x+1] = True
+            snippet = output.copy()
+        return output
+    
     def n_instances(self):
         if len(self.masks.shape) < 3:
             return 0
@@ -63,12 +83,11 @@ class CVMask():
         squashed_image = np.reshape(image, (height*width, n_channels))
 
         plane_mask = np.max(np.arange(1,n_masks+1, dtype=np.uint16)[None,None,:]*self.masks, axis=2).flatten()
-
-        for i in range(squashed_image.shape[0]):
+        for i in range(len(plane_mask)):
             mask_val = plane_mask[i] - 1
             if mask_val != -1:
-                channel_sums[mask_val] += squashed_image[i]
-                channel_counts[mask_val] += 1
+                channel_sums[mask_val.astype(np.int32)] += squashed_image[i]
+                channel_counts[mask_val.astype(np.int32)] += 1
 
         means = np.true_divide(channel_sums, channel_counts, out=np.zeros_like(channel_sums, dtype='float'), where=channel_counts!=0)
         return means, channel_counts[:,0]
@@ -105,8 +124,7 @@ class CVMask():
         self.bb_mins = []
         self.bb_maxes = []
 
-        import timeit
-        start = timeit.default_timer()
+
         for i in range(N):
             mask = self.masks[:, :, i]
             coords = np.where(mask)
@@ -115,10 +133,30 @@ class CVMask():
             self.bb_maxes.append((maxX, maxY))
             centroid = self.get_centroid(coords[0], coords[1])
             self.centroids.append(centroid)
-            snippet = mask[minY:maxY,minX:maxX]
-            new_snippet = self.expand_snippet(snippet, growth)
-            mask[minY:maxY,minX:maxX] = new_snippet
 
+    #grows masks by 1 pixel sequentially by first creating a temporary mask A expanded by 1 pixel, recording the collisions B, then taking the set difference A-B. Implicitly assumes that all masks in input are nonoverlapping
+    
+    def new_grow_by(self, growth):
+        
+        Y, X, N = self.masks.shape
+
+        for _ in range(growth):
+            for i in range(N):
+                mask = self.masks[:, :, i]
+                mins = self.bb_mins[i]
+                maxes = self.bb_maxes[i]
+                minX, minY, maxX, maxY = mins[0],mins[1],maxes[0],maxes[1]
+                snippet = mask[minY:maxY,minX:maxX]
+                all_snippets = self.masks[minY:maxY,minX:maxX,:].copy()
+                subY,subX,subN = all_snippets.shape
+                pixel_masks = np.zeros(snippet.shape,dtype=bool)
+                temp_snippet = self.new_expand_snippet(snippet,1,pixel_masks)
+                all_snippets[:,:,i] = temp_snippet
+                pixel_masks = (np.sum(all_snippets.astype(int),axis=2) > 1)
+                new_snippet = self.new_expand_snippet(snippet,1,pixel_masks)
+                mask[minY:maxY,minX:maxX] = new_snippet    
+        
+            
     def remove_overlaps_nearest_neighbors(self):
         Y, X, N = self.masks.shape
 
@@ -128,21 +166,20 @@ class CVMask():
                 pixel_masks = np.where(self.masks[y, x, :])[0]
                 if len(pixel_masks) == 2:
                     collisions.append(pixel_masks)
-
         for collision in collisions:
             c1, c2 = collision[0], collision[1]
             minX, minY = np.minimum(np.array(self.bb_mins[c1]), np.array(self.bb_mins[c2]))
             maxX, maxY = np.maximum(np.array(self.bb_maxes[c1]), np.array(self.bb_maxes[c2]))
-            c_pixels = np.where(self.masks[minY:maxY,minX:maxX,c1] & self.masks[minY:maxY,minX:maxX,c2])
+            c_pixels = np.where(self.masks[minY:maxY,minX:maxX,c1].astype(bool) & self.masks[minY:maxY,minX:maxX,c2].astype(bool))
             Y_collision = c_pixels[0]
             X_collision = c_pixels[1]
-
             for i in range(len(Y_collision)):
                 y_offset = minY + Y_collision[i]
                 x_offset = minX + X_collision[i]
                 
                 distance_to_c0 = distance.euclidean((x_offset, y_offset), self.centroids[c1])
                 distance_to_c1 = distance.euclidean((x_offset, y_offset), self.centroids[c2])
+                
                 
                 if distance_to_c0 > distance_to_c1:
                     self.masks[y_offset, x_offset, c1] = False
