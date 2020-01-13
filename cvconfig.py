@@ -36,11 +36,11 @@ class CVConfig():
     '''
     # Change these!
     IS_CODEX_OUTPUT = True
-    target = '/media/TitanRAID/CHRISTIAN/COLLABORATIONS/XIANGYUE_ZHANG/20190613_6spleens_mc_processed'
+    target = '/media/raid/jacob/CV_buggy_tile'
     output_path_name = "12_30_19"
     DIRECTORY_PATH = os.path.join(target, 'bestFocus')
     CHANNEL_PATH = os.path.join(target, 'channelNames.txt')
-    NUCLEAR_CHANNEL_NAME = 'DRAQ5'
+    NUCLEAR_CHANNEL_NAME = 'DNA1'
     GROWTH_PIXELS = 0
     OUTPUT_METHOD = 'all'
     BOOST = 'auto'
@@ -86,5 +86,6 @@ class CVConfig():
                 print('Using autoboost reference image with filename', self.AUTOBOOST_REFERENCE_IMAGE)
             else:
                 print('AUTOBOOST_REFERENCE_IMAGE does not exist.  Check your config file - image filename must match exactly.')
+                print('Defaulting to first image reference...')
 
         self.N_DIMS, self.EXT, self.DTYPE, self.SHAPE, self.READ_METHOD = cvutils.meta_from_image(reference_image_path)

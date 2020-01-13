@@ -51,8 +51,8 @@ class CVMaskStitcher():
 
             masks1 = masks1[:, :, list(set(np.arange(0, N1)) - set(del_indices_1))]
             masks2 = masks2[:, :, list(set(np.arange(0, N2)) - set(del_indices_2))]
-            masks1 = np.pad(masks1,[(0,0),(0,pad_after_left), (0,0)], 'constant')
-            masks2 = np.pad(masks2,[(0,0),(pad_before_right,0), (0,0)], 'constant')
+        masks1 = np.pad(masks1,[(0,0),(0,pad_after_left), (0,0)], 'constant')
+        masks2 = np.pad(masks2,[(0,0),(pad_before_right,0), (0,0)], 'constant')
 
         return np.concatenate((masks1, masks2), axis=2)
 
@@ -91,8 +91,8 @@ class CVMaskStitcher():
 
             masks1 = masks1[:, :, list(set(np.arange(0, N1)) - set(del_indices_1))]
             masks2 = masks2[:, :, list(set(np.arange(0, N2)) - set(del_indices_2))]
-            masks1 = np.pad(masks1,[(0,pad_below_top),(0,0), (0,0)], 'constant')
-            masks2 = np.pad(masks2,[(pad_above_bottom,0),(0,0), (0,0)], 'constant')
+        masks1 = np.pad(masks1,[(0,pad_below_top),(0,0), (0,0)], 'constant')
+        masks2 = np.pad(masks2,[(pad_above_bottom,0),(0,0), (0,0)], 'constant')
 
         return np.concatenate((masks1, masks2), axis=2)
     
