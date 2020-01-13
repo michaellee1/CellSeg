@@ -39,7 +39,7 @@ def main():
         cf.SHAPE,
         cf.MODEL_PATH,
         cf.OVERLAP,
-        cf.INCREASE_FACTOR
+        cf.INCREASE_FACTOR,
         cf.THRESHOLD
     )
 

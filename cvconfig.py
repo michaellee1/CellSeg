@@ -17,6 +17,8 @@ class CVConfig():
     GROWTH_PIXELS - number of pixels from which to grow out from the nucleus to define a cell boundary.  Change based on tissue types.
     OUTPUT_METHOD - (imagej_text_file, statistics, visual_image_output, visual_overlay_output, all)
     BOOST - multiplier with which to boost the pixels of the nuclear stain before inference.  Choose 'auto' to try to infer the best boost to use based off of AUTOBOOST_PERCENTILE
+    AUTOBOOST_REFERENCE_IMAGE - If autoboosting, then set this to the image's filename to choose which image to autoboost off of (generally choose a non-empty image).  If image not 
+    found or empty, then just uses first filename to autoboost.  Does not set boost if BOOST is not set to 'auto', but gets metadata from selected image.
     MODEL_DIRECTORY - path to save logs to (not important)
     MODEL_PATH - path that contains your .h5 saved weights file for the model
     OVERLAP - amount of pixels overlap with which to run the stitching algorithm. Must be divisible by 2, and should be > cell diameter
@@ -42,6 +44,7 @@ class CVConfig():
     GROWTH_PIXELS = 0
     OUTPUT_METHOD = 'all'
     BOOST = 'auto'
+    AUTOBOOST_REFERENCE_IMAGE = 'reg001_X01_Y01_Z04.tif' #ie 'cellimage1.tif'
 
     # Usually not changed
     root = os.path.dirname(os.path.realpath(__file__))
@@ -73,6 +76,15 @@ class CVConfig():
         if len(self.FILENAMES) < 1:
             raise NameError(
                 'No image files found.  Make sure you are pointing to the right directory')
+        
+        reference_image_path = os.path.join(self.DIRECTORY_PATH, self.FILENAMES[0])
 
-        self.N_DIMS, self.EXT, self.DTYPE, self.SHAPE, self.READ_METHOD = cvutils.meta_from_image(os.path.join(
-            self.DIRECTORY_PATH, self.FILENAMES[0]))
+        if self.AUTOBOOST_REFERENCE_IMAGE != '' and self.BOOST == 'auto':
+            if self.AUTOBOOST_REFERENCE_IMAGE in self.FILENAMES:
+                self.FILENAMES.remove(self.AUTOBOOST_REFERENCE_IMAGE)
+                self.FILENAMES.insert(0, self.AUTOBOOST_REFERENCE_IMAGE)
+                print('Using autoboost reference image with filename', self.AUTOBOOST_REFERENCE_IMAGE)
+            else:
+                print('AUTOBOOST_REFERENCE_IMAGE does not exist.  Check your config file - image filename must match exactly.')
+
+        self.N_DIMS, self.EXT, self.DTYPE, self.SHAPE, self.READ_METHOD = cvutils.meta_from_image(reference_image_path)
