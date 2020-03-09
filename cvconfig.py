@@ -36,7 +36,8 @@ class CVConfig():
     '''
     # Change these!
     IS_CODEX_OUTPUT = True
-    target = '/media/raid/jacob/CV_buggy_tile'
+    SHOULD_COMPENSATE = True
+    target = './example_tile'
     output_path_name = "12_30_19"
     DIRECTORY_PATH = os.path.join(target, 'bestFocus')
     CHANNEL_PATH = os.path.join(target, 'channelNames.txt')

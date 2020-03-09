@@ -103,7 +103,11 @@ def main():
             if cf.IS_CODEX_OUTPUT:
                 reg, tile_row, tile_col, tile_z = cvutils.extract_tile_information(
                     filename)
-            channel_means, size = stitched_mask.compute_channel_means_sums(image)
+            channel_means, size = None, None
+            if cf.SHOULD_COMPENSATE == True:
+                channel_means, size = stitched_mask.compute_channel_means_sums_compensated(image)
+            else:
+                channel_means, size = stitched_mask.compute_channel_means_sums(image)
             centroids = stitched_mask.compute_centroids()
             absolutes = stitched_mask.absolute_centroids(tile_row, tile_col)
 

@@ -3,6 +3,7 @@
 # Wrapper class for masks.  See class doc for details.
 
 import numpy as np
+from scipy.linalg import lstsq
 from scipy.spatial import distance
 from operator import itemgetter
 from skimage.measure import find_contours
@@ -91,6 +92,50 @@ class CVMask():
 
         means = np.true_divide(channel_sums, channel_counts, out=np.zeros_like(channel_sums, dtype='float'), where=channel_counts!=0)
         return means, channel_counts[:,0]
+
+    def update_adjacency_value(self, adjacency_matrix, original, neighbor):
+        if original != 0 and neighbor != 0:
+            if original != neighbor:
+                adjacency_matrix[int(original - 1), int(neighbor - 1)] += 1
+
+    def update_adjacency_matrix(self, plane_mask_flattened, width, height, adjacency_matrix, index):
+        mod_value_width = index % width
+        origin_mask = plane_mask_flattened[index]
+
+        if (mod_value_width != 0):
+            self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index-1])
+        if (mod_value_width != width - 1):
+            self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index-1])
+        if (index >= width):
+            self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index-width])
+        if (index <= len(plane_mask_flattened) - 1 - width):
+            self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index+width])
+
+    def compute_channel_means_sums_compensated(self, image):
+        height, width, n_channels = image.shape
+        mask_height, mask_width, n_masks = self.masks.shape
+        channel_sums = np.zeros((n_masks, n_channels))
+        channel_counts = np.zeros((n_masks, n_channels))
+        if n_masks == 0:
+            return channel_sums, channel_counts
+
+        squashed_image = np.reshape(image, (height*width, n_channels))
+
+        plane_mask = np.max(np.arange(1,n_masks+1, dtype=np.uint16)[None,None,:]*self.masks, axis=2).flatten()
+
+        adjacency_matrix = np.ones((n_masks, n_masks))
+        for i in range(len(plane_mask)):
+            self.update_adjacency_matrix(plane_mask, mask_width, mask_height, adjacency_matrix, i)
+            
+            mask_val = plane_mask[i] - 1
+            if mask_val != -1:
+                channel_sums[mask_val.astype(np.int32)] += squashed_image[i]
+                channel_counts[mask_val.astype(np.int32)] += 1
+
+        means = np.true_divide(channel_sums, channel_counts, out=np.zeros_like(channel_sums, dtype='float'), where=channel_counts!=0)
+        results = lstsq(adjacency_matrix, means, overwrite_a=True, overwrite_b=True)
+        compensated_means = results[0]
+        return compensated_means, channel_counts[:,0]
 
     def compute_centroids(self):
         if self.centroids is None:
