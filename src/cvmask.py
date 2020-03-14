@@ -161,6 +161,13 @@ class CVMask():
         absolutes = centroids + offsets
 
         return absolutes
+    
+    def applyXYoffset(masks,offset_vector):
+    #masks = self.masks
+        for i in range(masks.shape[2]):
+            masks[0,:,i] += offset_vector[0]
+            masks[1,:,i] += offset_vector[1]
+        return masks
 
     def grow_by(self, growth):
         Y, X, N = self.masks.shape
@@ -199,7 +206,8 @@ class CVMask():
                 all_snippets[:,:,i] = temp_snippet
                 pixel_masks = (np.sum(all_snippets.astype(int),axis=2) > 1)
                 new_snippet = self.new_expand_snippet(snippet,1,pixel_masks)
-                mask[minY:maxY,minX:maxX] = new_snippet    
+                mask[minY:maxY,minX:maxX] = new_snippet  
+       # self.masks = mask
         
             
     def remove_overlaps_nearest_neighbors(self):
@@ -230,6 +238,41 @@ class CVMask():
                     self.masks[y_offset, x_offset, c1] = False
                 else:
                     self.masks[y_offset, x_offset, c2] = False
+             
+    def binarydilate(self,pixels=1):
+        masks = self.masks
+        from skimage.morphology import disk
+        from scipy.ndimage.morphology import binary_dilation
+        struc = disk(pixels)
+
+        #binary dilate each mask
+        for i in range(masks.shape[2]):
+            masks[:,:,i] = binary_dilation(masks[:,:,i],structure =struc)
+        self.masks = masks
+#         return masks
+
+    def remove_conflicts_nn(self):
+        from sklearn.neighbors import NearestNeighbors
+        #get coordinates of conflicting pixels
+        masks = self.masks
+        conf_r,conf_c = np.where(masks.sum(2)>1)
+
+        #centroids of each mask
+        centroids = self.centroids
+        cen = np.array(centroids)
+
+        X = np.stack([conf_r,conf_c]).T
+        nn = NearestNeighbors(n_neighbors=1).fit(cen)
+        dis,idx = nn.kneighbors(n_neighbors =1,X = X)
+        m_changed = masks.copy()
+
+        #set 0 across all masks at conflicted pixels
+        m_changed[conf_r,conf_c,:] = 0
+        #only at final mask index, set to 1
+        m_changed[conf_r,conf_c,idx[:,0]] = 1
+
+        self.masks = m_changed
+        #return m_changed
 
     def sort_into_strips(self):
         N = self.n_instances()
