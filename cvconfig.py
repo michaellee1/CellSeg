@@ -39,7 +39,7 @@ class CVConfig():
     SHOULD_COMPENSATE = True
     target = 'D:/Yury/Nate89_2018.10.22_Cyclops_tyrp-51_processed/bestFocus/reg5/'
     output_path_name = "D:/Yury/Nate89_2018.10.22_Cyclops_tyrp-51_processed/bestFocus/reg5/RCNNseg_results"
-    DIRECTORY_PATH = os.path.join(target, 'testzone')
+    DIRECTORY_PATH = os.path.join(target, 'reg5_large')
     CHANNEL_PATH = os.path.join(target, 'channelNames.txt')
     NUCLEAR_CHANNEL_NAME = 'segf253'
     GROWTH_PIXELS = 3
