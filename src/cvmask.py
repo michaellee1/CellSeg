@@ -273,6 +273,13 @@ class CVMask():
 
         self.masks = m_changed
         #return m_changed
+    def flatten_masks(self):
+        flat_masks = self.masks.copy().astype(np.uint32)
+
+        for i in range(flat_masks.shape[2]):
+            r,c = np.where(flat_masks[:,:,i]==1)
+            flat_masks[r,c,i] = i
+        self.flat_masks = flat_masks.sum(2)
 
     def sort_into_strips(self):
         N = self.n_instances()
