@@ -110,6 +110,9 @@ def main():
         #stitched_mask.remove_overlaps_nearest_neighbors()
         #stitched_mask.applyXYoffset(cf.offset_vector)
         
+        #record masks as flattened array
+        stitched_mask.flatten_masks()
+        
 
         if not os.path.exists(cf.IMAGEJ_OUTPUT_PATH):
             os.makedirs(cf.IMAGEJ_OUTPUT_PATH)
@@ -131,6 +134,10 @@ def main():
             figsize = (cf.SHAPE[1] // 25, cf.SHAPE[0] // 25)
             cvvisualize.generate_instances_and_save(
                 new_path + '.png', nuclear_image, stitched_mask.masks[1:,1:,:], figsize=figsize)
+            
+            flat_mask = stitched_mask.flat_masks
+            i = Image.fromarray(flat_mask)
+            i.save(new_path+'labeled_mask.tif')
         
         if cf.OUTPUT_METHOD == 'visual_overlay_output' or cf.OUTPUT_METHOD == 'all':
             print('Creating visual overlay output saved to', cf.VISUAL_OUTPUT_PATH)
