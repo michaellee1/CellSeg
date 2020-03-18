@@ -121,7 +121,7 @@ def main():
         if not os.path.exists(cf.QUANTIFICATION_OUTPUT_PATH):
             os.makedirs(cf.QUANTIFICATION_OUTPUT_PATH)
 
-        if cf.OUTPUT_METHOD == 'imagej_text_file' or cf.OUTPUT_METHOD == 'all':
+        if cf.OUTPUT_METHOD == 'imagej_text_file':
             print('Sort into strips and outputting:', filename)
             new_path = os.path.join(
                 cf.IMAGEJ_OUTPUT_PATH, (filename[:-4] + '-coords.txt'))
@@ -164,7 +164,7 @@ def main():
                     metadata_list, (stitched_mask.n_instances(), len(metadata_list)))
 
                 semi_dataframe = np.concatenate(
-                    [metadata, centroids, absolutes, size[:, None], channel_means_comp, channel_means_uncomp,], axis=1)
+                    [metadata, centroids, absolutes, size[:, None], channel_means_uncomp], axis=1)
 #                dataframe_regs[reg].append(semi_dataframe)
 
             descriptive_labels = [
@@ -184,7 +184,7 @@ def main():
                 n_channels = cf.SHAPE[2]
                 if n_channels == 3:
                     cf.CHANNEL_NAMES = ['Red', 'Green', 'Blue']
-            columns = descriptive_labels + [s + "_comp" for s in cf.CHANNEL_NAMES]+[s + "_UNcomp" for s in cf.CHANNEL_NAMES]
+            columns = descriptive_labels + [s + "_UNcomp" for s in cf.CHANNEL_NAMES]
             dataframe = pd.DataFrame(semi_dataframe, columns=columns)
 
             path = os.path.join(cf.QUANTIFICATION_OUTPUT_PATH, filename[:-4]+ 'statistics_growth' + str(growth))
