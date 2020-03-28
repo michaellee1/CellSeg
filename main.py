@@ -63,8 +63,8 @@ def main():
         nuclear_index = None
         if cf.N_DIMS == 4:
             nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
-            cf.N_DIMS = 3
-        nuclear_image = cvutils.get_nuclear_image(cf.N_DIMS, image, nuclear_index=nuclear_index)
+#            cf.N_DIMS = 3
+        nuclear_image = cvutils.get_nuclear_image(cf.N_DIMS-1, image, nuclear_index=nuclear_index)
 
         if cf.BOOST == 'auto':
             print('Using auto boosting - may be inaccurate for empty or noisy images.')
@@ -76,9 +76,23 @@ def main():
 
         print('\nSegmenting with CellVision:', filename)
         masks, rows, cols = segmenter.segment_image(nuclear_image)
+#        return masks
+#        masks=np.array(masks)
+    
+#        for i in range(masks.shape[2]):
+#            masks[i] = masks[6:,6:,i]
+
 
         print('Stitching:', filename)
         stitched_mask = CVMask(stitcher.stitch_masks(masks, rows, cols))
+#        stitched_mask = CVMask(stitcher.stitch_masks(masks[6:,6:,:], rows, cols))
+        
+#        stitched_mask.masks = np.array(stitched_mask.masks)
+
+#        for i in range(stitched_mask.masks.shape[2]):
+#            stitched_mask.masks[i] = stitched_mask.masks[6:,6:,i]
+        
+        
         instances = stitched_mask.n_instances()
         print(instances, 'cell masks found by segmenter')
         if instances == 0:
@@ -87,8 +101,25 @@ def main():
 
         print('Growing cells by', growth, 'pixels:', filename)
         stitched_mask.grow_by(growth)
+#        return stitched_mask
+        stitched_mask.binarydilate(growth)
         print('Removing overlaps by nearest neighbor:', filename)
-        stitched_mask.remove_overlaps_nearest_neighbors()
+        #stitched_mask.remove_overlaps_nearest_neighbors()
+        stitched_mask.remove_conflicts_nn()
+        print('applyring XY offset', filename)
+        #stitched_mask.remove_overlaps_nearest_neighbors()
+        #stitched_mask.applyXYoffset(cf.offset_vector)
+        
+        #record masks as flattened array
+        stitched_mask.flatten_masks()
+        
+
+        if not os.path.exists(cf.IMAGEJ_OUTPUT_PATH):
+            os.makedirs(cf.IMAGEJ_OUTPUT_PATH)
+        if not os.path.exists(cf.VISUAL_OUTPUT_PATH):
+            os.makedirs(cf.VISUAL_OUTPUT_PATH)
+        if not os.path.exists(cf.QUANTIFICATION_OUTPUT_PATH):
+            os.makedirs(cf.QUANTIFICATION_OUTPUT_PATH)
 
         if cf.OUTPUT_METHOD == 'imagej_text_file':
             print('Sort into strips and outputting:', filename)
@@ -97,6 +128,22 @@ def main():
             stitched_mask.sort_into_strips()
             stitched_mask.output_to_file(new_path)
 
+        if cf.OUTPUT_METHOD == 'visual_image_output' or cf.OUTPUT_METHOD == 'all':
+            print('Creating visual output saved to', cf.VISUAL_OUTPUT_PATH)
+            new_path = os.path.join(cf.VISUAL_OUTPUT_PATH, filename[:-4]) + 'visual_growth' + str(growth)
+            figsize = (cf.SHAPE[1] // 25, cf.SHAPE[0] // 25)
+            cvvisualize.generate_instances_and_save(
+                new_path + '.png', nuclear_image, stitched_mask.masks[1:,1:,:], figsize=figsize)
+            
+            flat_mask = stitched_mask.flat_masks
+            i = Image.fromarray(flat_mask)
+            i.save(new_path+'labeled_mask.tif')
+        
+        if cf.OUTPUT_METHOD == 'visual_overlay_output' or cf.OUTPUT_METHOD == 'all':
+            print('Creating visual overlay output saved to', cf.VISUAL_OUTPUT_PATH)
+            new_path = os.path.join(cf.VISUAL_OUTPUT_PATH, filename[:-4]) + 'growth' + str(growth) + 'mask.tif'
+            cvvisualize.generate_masks_and_save(new_path, nuclear_image, stitched_mask.masks[1:,1:,:])
+
         if cf.OUTPUT_METHOD == 'statistics' or cf.OUTPUT_METHOD == 'all':
             print('Calculating statistics:', filename)
             reg, tile_row, tile_col, tile_z = 0, 1, 1, 0
@@ -104,10 +151,10 @@ def main():
                 reg, tile_row, tile_col, tile_z = cvutils.extract_tile_information(
                     filename)
             channel_means, size = None, None
-            if cf.SHOULD_COMPENSATE == True:
-                channel_means, size = stitched_mask.compute_channel_means_sums_compensated(image)
-            else:
-                channel_means, size = stitched_mask.compute_channel_means_sums(image)
+#            if cf.SHOULD_COMPENSATE == True:
+            channel_means_comp, size = stitched_mask.compute_channel_means_sums_compensated(image)
+#            else:
+            channel_means_uncomp, size = stitched_mask.compute_channel_means_sums(image)
             centroids = stitched_mask.compute_centroids()
             absolutes = stitched_mask.absolute_centroids(tile_row, tile_col)
 
@@ -117,26 +164,9 @@ def main():
                     metadata_list, (stitched_mask.n_instances(), len(metadata_list)))
 
                 semi_dataframe = np.concatenate(
-                    [metadata, centroids, absolutes, size[:, None], channel_means], axis=1)
-                dataframe_regs[reg].append(semi_dataframe)
+                    [metadata, centroids, absolutes, size[:, None], channel_means_uncomp], axis=1)
+#                dataframe_regs[reg].append(semi_dataframe)
 
-        if cf.OUTPUT_METHOD == 'visual_image_output' or cf.OUTPUT_METHOD == 'all':
-            print('Creating visual output saved to', cf.VISUAL_OUTPUT_PATH)
-            new_path = os.path.join(cf.VISUAL_OUTPUT_PATH, filename[:-4]) + 'visual_growth' + str(growth)
-            figsize = (cf.SHAPE[1] // 25, cf.SHAPE[0] // 25)
-            cvvisualize.generate_instances_and_save(
-                new_path + '.png', nuclear_image, stitched_mask.masks, figsize=figsize)
-        
-        if cf.OUTPUT_METHOD == 'visual_overlay_output' or cf.OUTPUT_METHOD == 'all':
-            print('Creating visual overlay output saved to', cf.VISUAL_OUTPUT_PATH)
-            new_path = os.path.join(cf.VISUAL_OUTPUT_PATH, filename[:-4]) + 'growth' + str(growth) + 'mask.tif'
-            cvvisualize.generate_masks_and_save(
-                new_path, nuclear_image, stitched_mask.masks)        
-
-    if cf.OUTPUT_METHOD == 'statistics' or cf.OUTPUT_METHOD == 'all':
-        for reg in dataframe_regs:
-            dataframe_list = dataframe_regs[reg]
-            full_df_array = np.concatenate(dataframe_list, axis=0)
             descriptive_labels = [
                 'Reg',
                 'Tile Row',
@@ -154,13 +184,13 @@ def main():
                 n_channels = cf.SHAPE[2]
                 if n_channels == 3:
                     cf.CHANNEL_NAMES = ['Red', 'Green', 'Blue']
-            columns = descriptive_labels + list(cf.CHANNEL_NAMES)
-            dataframe = pd.DataFrame(full_df_array, columns=columns)
+            columns = descriptive_labels + [s + "_UNcomp" for s in cf.CHANNEL_NAMES]
+            dataframe = pd.DataFrame(semi_dataframe, columns=columns)
 
-            path = os.path.join(cf.QUANTIFICATION_OUTPUT_PATH, filename[:-4]+ '_reg' + str(reg) + '_growth' + str(growth))
+            path = os.path.join(cf.QUANTIFICATION_OUTPUT_PATH, filename[:-4]+ 'statistics_growth' + str(growth))
             dataframe.to_csv(path + '.csv')
             # Output to .fcs file
-            fcswrite.write_fcs(path + '.fcs', columns, full_df_array)
+            #fcswrite.write_fcs(path + '.fcs', columns, full_df_array)
 
 if __name__ == "__main__":
     main()

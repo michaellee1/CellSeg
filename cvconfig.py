@@ -37,12 +37,12 @@ class CVConfig():
     # Change these!
     IS_CODEX_OUTPUT = True
     SHOULD_COMPENSATE = True
-    target = './example_tile'
-    output_path_name = "12_30_19"
-    DIRECTORY_PATH = os.path.join(target, 'bestFocus')
+    target = 'D:/Yury/Nate89_2018.10.22_Cyclops_tyrp-51_processed/bestFocus/reg5/'
+    output_path_name = "D:/Yury/Nate89_2018.10.22_Cyclops_tyrp-51_processed/bestFocus/reg5/RCNNseg_results"
+    DIRECTORY_PATH = os.path.join(target, 'reg5_large')
     CHANNEL_PATH = os.path.join(target, 'channelNames.txt')
-    NUCLEAR_CHANNEL_NAME = 'DNA1'
-    GROWTH_PIXELS = 0
+    NUCLEAR_CHANNEL_NAME = 'segf253'
+    GROWTH_PIXELS = 3
     OUTPUT_METHOD = 'all'
     BOOST = 'auto'
     AUTOBOOST_REFERENCE_IMAGE = 'reg001_X01_Y01_Z04.tif' #ie 'cellimage1.tif'
@@ -51,9 +51,9 @@ class CVConfig():
     root = os.path.dirname(os.path.realpath(__file__))
     MODEL_DIRECTORY = os.path.join(root, 'modelFiles')
     MODEL_PATH = os.path.join(root, 'src', 'modelFiles', 'final_weights.h5')
-    IMAGEJ_OUTPUT_PATH = os.path.join(root, 'output', output_path_name, 'imagej_files')
-    QUANTIFICATION_OUTPUT_PATH = os.path.join(root, 'output', output_path_name,'quantifications')
-    VISUAL_OUTPUT_PATH = os.path.join(root, 'output', output_path_name,'visual_output')
+    IMAGEJ_OUTPUT_PATH = os.path.join(output_path_name, 'imagej_files')
+    QUANTIFICATION_OUTPUT_PATH = os.path.join(output_path_name,'quantifications')
+    VISUAL_OUTPUT_PATH = os.path.join(output_path_name,'visual_output')
     try:
         os.makedirs(IMAGEJ_OUTPUT_PATH)
         os.makedirs(QUANTIFICATION_OUTPUT_PATH)
