@@ -94,22 +94,30 @@ class CVMask():
         return means, channel_counts[:,0]
 
     def update_adjacency_value(self, adjacency_matrix, original, neighbor):
-        if original != 0 and neighbor != 0:
-            if original != neighbor:
+        border = False
+
+        if original != 0 and original != neighbor:
+            border = True
+            if neighbor != 0:
                 adjacency_matrix[int(original - 1), int(neighbor - 1)] += 1
+        return border
 
     def update_adjacency_matrix(self, plane_mask_flattened, width, height, adjacency_matrix, index):
         mod_value_width = index % width
         origin_mask = plane_mask_flattened[index]
+        left, right, up, down = False, False, False, False
 
         if (mod_value_width != 0):
-            self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index-1])
+            left = self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index-1])
         if (mod_value_width != width - 1):
-            self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index-1])
+            right = self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index+1])
         if (index >= width):
-            self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index-width])
+            up = self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index-width])
         if (index <= len(plane_mask_flattened) - 1 - width):
-            self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index+width])
+            down = self.update_adjacency_value(adjacency_matrix, origin_mask, plane_mask_flattened[index+width])
+        
+        if (left or right or up or down):
+            adjacency_matrix[int(origin_mask - 1), int(origin_mask-1)] += 1
 
     def compute_channel_means_sums_compensated(self, image):
         height, width, n_channels = image.shape
@@ -123,7 +131,7 @@ class CVMask():
 
         plane_mask = np.max(np.arange(1,n_masks+1, dtype=np.uint16)[None,None,:]*self.masks, axis=2).flatten()
 
-        adjacency_matrix = np.ones((n_masks, n_masks))
+        adjacency_matrix = np.zeros((n_masks, n_masks))
         for i in range(len(plane_mask)):
             self.update_adjacency_matrix(plane_mask, mask_width, mask_height, adjacency_matrix, i)
             

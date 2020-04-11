@@ -42,15 +42,15 @@ class CVConfig():
     scripter if we pick output to imagej_text_file
     '''
     # Change these!
-    IS_CODEX_OUTPUT = True
-    SHOULD_COMPENSATE = True
-    target = 'D:/Yury/Nate89_2018.10.22_Cyclops_tyrp-51_processed/bestFocus/reg5/'
-    output_path_name = "D:/Yury/Nate89_2018.10.22_Cyclops_tyrp-51_processed/bestFocus/reg5/RCNNseg_results"
-    DIRECTORY_PATH = os.path.join(target, 'reg5_large')
+    IS_CODEX_OUTPUT = False
+    SHOULD_COMPENSATE = False
+    target = './example_tile'
+    output_path_name = "12_30_19"
+    DIRECTORY_PATH = os.path.join(target, 'bestFocus')
     CHANNEL_PATH = os.path.join(target, 'channelNames.txt')
-    NUCLEAR_CHANNEL_NAME = 'segf253'
-    GROWTH_PIXELS = 3
-    OUTPUT_METHOD = 'all'
+    NUCLEAR_CHANNEL_NAME = 'DNA1'
+    GROWTH_PIXELS = 0
+    OUTPUT_METHOD = 'visual_image_output'
     BOOST = 'auto'
     AUTOBOOST_REFERENCE_IMAGE = 'reg001_X01_Y01_Z04.tif' #ie 'cellimage1.tif'
     FILENAME_ENDS_TO_EXCLUDE = ('montage.tif')

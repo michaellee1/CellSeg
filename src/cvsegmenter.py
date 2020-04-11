@@ -51,7 +51,6 @@ class CVSegmenter:
         model = modellib.MaskRCNN(mode="inference", 
                           config=inference_config)
         model.load_weights(model_path, by_name=True)
-
         return model
     
     def get_overlap_coordinates(self, rows, cols, i, j, x1, x2, y1, y2):
