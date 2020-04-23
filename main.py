@@ -135,9 +135,10 @@ def main():
             cvvisualize.generate_instances_and_save(
                 new_path + '.png', nuclear_image, stitched_mask.masks[1:,1:,:], figsize=figsize)
             
-            flat_mask = stitched_mask.flat_masks
-            i = Image.fromarray(flat_mask)
-            i.save(new_path+'labeled_mask.tif')
+            if cf.IS_CODEX_OUTPUT:
+                flat_mask = stitched_mask.flat_masks
+                i = Image.fromarray(flat_mask)
+                i.save(new_path+'labeled_mask.tif')
         
         if cf.OUTPUT_METHOD == 'visual_overlay_output' or cf.OUTPUT_METHOD == 'all':
             print('Creating visual overlay output saved to', cf.VISUAL_OUTPUT_PATH)
@@ -152,9 +153,8 @@ def main():
                     filename)
             channel_means, size = None, None
 #            if cf.SHOULD_COMPENSATE == True:
-            channel_means_comp, size = stitched_mask.compute_channel_means_sums_compensated(image)
+            channel_means_comp, channel_means_uncomp, size = stitched_mask.compute_channel_means_sums_compensated(image)
 #            else:
-            channel_means_uncomp, size = stitched_mask.compute_channel_means_sums(image)
             centroids = stitched_mask.compute_centroids()
             absolutes = stitched_mask.absolute_centroids(tile_row, tile_col)
 

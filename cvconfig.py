@@ -81,7 +81,7 @@ class CVConfig():
 
         VALID_IMAGE_EXTENSIONS = ('tif', 'jpg', 'png')
         self.FILENAMES = [f for f in os.listdir(self.DIRECTORY_PATH) if f.endswith(
-            VALID_IMAGE_EXTENSIONS) and not f.startswith('.') and not f.endswith(FILENAME_ENDS_TO_EXCLUDE)]
+            VALID_IMAGE_EXTENSIONS) and not f.startswith('.') and not f.endswith(self.FILENAME_ENDS_TO_EXCLUDE)]
         if len(self.FILENAMES) < 1:
             raise NameError(
                 'No image files found.  Make sure you are pointing to the right directory')
