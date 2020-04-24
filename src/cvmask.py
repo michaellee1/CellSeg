@@ -127,7 +127,7 @@ class CVMask():
 
         means = np.true_divide(channel_sums, channel_counts, out=np.zeros_like(channel_sums, dtype='float'), where=channel_counts!=0)
         results = lstsq(adjacency_matrix, means, overwrite_a=True, overwrite_b=False)
-        compensated_means = np.minimum(results[0], np.zeros((1,1)))        
+        compensated_means = np.maximum(results[0], np.zeros((1,1)))        
 
         return compensated_means, means, channel_counts[:,0]
 
