@@ -250,7 +250,10 @@ class CVMask():
         #get coordinates of conflicting pixels
         masks = self.masks
         conf_r,conf_c = np.where(masks.sum(2)>1)
-
+        
+        if len(conf_r) < 1: # no conflicts
+            return
+        
         #centroids of each mask
         centroids = self.centroids
         cen = np.array(centroids)

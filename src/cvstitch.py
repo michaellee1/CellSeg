@@ -128,5 +128,5 @@ class CVMaskStitcher():
             plane_mask = np.max(np.arange(1,n_masks+1, dtype=np.uint16)[None,None,:]*masks, axis=2).flatten()
         np.add.at(channel_counts, plane_mask, 1)
         keep_indices = np.where(channel_counts[1:] > self.threshold)
-        return masks[:, :, keep_indices].squeeze()
+        return masks[:, :, keep_indices].reshape(masks.shape[0:2] + (-1,))
 
