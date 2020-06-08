@@ -63,7 +63,6 @@ def main():
         nuclear_index = None
         if cf.N_DIMS == 4:
             nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
-#            cf.N_DIMS = 3
         nuclear_image = cvutils.get_nuclear_image(cf.N_DIMS-1, image, nuclear_index=nuclear_index)
 
         if cf.BOOST == 'auto':
@@ -76,23 +75,10 @@ def main():
 
         print('\nSegmenting with CellVision:', filename)
         masks, rows, cols = segmenter.segment_image(nuclear_image)
-#        return masks
-#        masks=np.array(masks)
-    
-#        for i in range(masks.shape[2]):
-#            masks[i] = masks[6:,6:,i]
-
 
         print('Stitching:', filename)
         stitched_mask = CVMask(stitcher.stitch_masks(masks, rows, cols))
-#        stitched_mask = CVMask(stitcher.stitch_masks(masks[6:,6:,:], rows, cols))
-        
-#        stitched_mask.masks = np.array(stitched_mask.masks)
 
-#        for i in range(stitched_mask.masks.shape[2]):
-#            stitched_mask.masks[i] = stitched_mask.masks[6:,6:,i]
-        
-        
         instances = stitched_mask.n_instances()
         print(instances, 'cell masks found by segmenter')
         if instances == 0:
@@ -101,14 +87,10 @@ def main():
 
         print('Growing cells by', growth, 'pixels:', filename)
         stitched_mask.grow_by(growth)
-#        return stitched_mask
         stitched_mask.binarydilate(growth)
         print('Removing overlaps by nearest neighbor:', filename)
-        #stitched_mask.remove_overlaps_nearest_neighbors()
         stitched_mask.remove_conflicts_nn()
         print('applyring XY offset', filename)
-        #stitched_mask.remove_overlaps_nearest_neighbors()
-        #stitched_mask.applyXYoffset(cf.offset_vector)
         
         #record masks as flattened array
         stitched_mask.flatten_masks()
@@ -134,11 +116,6 @@ def main():
             figsize = (cf.SHAPE[1] // 25, cf.SHAPE[0] // 25)
             cvvisualize.generate_instances_and_save(
                 new_path + '.png', nuclear_image, stitched_mask.masks[1:,1:,:], figsize=figsize)
-            
-            if cf.IS_CODEX_OUTPUT:
-                flat_mask = stitched_mask.flat_masks
-                i = Image.fromarray(flat_mask)
-                i.save(new_path+'labeled_mask.tif')
         
         if cf.OUTPUT_METHOD == 'visual_overlay_output' or cf.OUTPUT_METHOD == 'all':
             print('Creating visual overlay output saved to', cf.VISUAL_OUTPUT_PATH)
@@ -165,7 +142,6 @@ def main():
 
                 semi_dataframe = np.concatenate(
                     [metadata, centroids, absolutes, size[:, None], channel_means_uncomp], axis=1)
-#                dataframe_regs[reg].append(semi_dataframe)
 
             descriptive_labels = [
                 'Reg',
