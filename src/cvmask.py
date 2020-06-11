@@ -105,7 +105,7 @@ class CVMask():
         channel_sums = np.zeros((n_masks, n_channels))
         channel_counts = np.zeros((n_masks, n_channels))
         if n_masks == 0:
-            return channel_sums, channel_counts
+            return channel_sums, channel_sums, channel_counts
 
         squashed_image = np.reshape(image, (height*width, n_channels))
 
