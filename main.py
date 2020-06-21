@@ -26,7 +26,7 @@ def main():
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     cf = CVConfig()
 
-    print('Initializing CVSegmenter at', cf.DIRECTORY_PATH)
+    print('Initializing CSSegmenter at', cf.DIRECTORY_PATH)
     if cf.IS_CODEX_OUTPUT:
         print('Picking channel', cf.NUCLEAR_CHANNEL_NAME, 'from',
             len(cf.CHANNEL_NAMES), 'total to segment on')
@@ -46,12 +46,21 @@ def main():
     growth = cf.GROWTH_PIXELS
     rows, cols = None, None
     dataframe_regs = defaultdict(list)
+    columns = []
+    path=''
 
     if cf.OUTPUT_METHOD not in ['imagej_text_file', 'statistics', 'visual_image_output', 'visual_overlay_output', 'all']:
         raise NameError(
                 'Output method is not supported.  Check the OUTPUT_METHOD variable in cvconfig.py.')
-
+    print("Checking previous segmentation progress...")
+    progress_table = cf.PROGRESS_TABLE
+    print("These tiles already segmented: ")
+    print(progress_table)
+    cf.FILENAMES = [item for item in cf.FILENAMES if item not in progress_table]
+    cf.FILENAMES.sort()
+    
     count = 0
+
     for filename in cf.FILENAMES:
         count += 1
 
@@ -73,7 +82,7 @@ def main():
 
         nuclear_image = cvutils.boost_image(nuclear_image, cf.BOOST)
 
-        print('\nSegmenting with CellVision:', filename)
+        print('\nSegmenting with CellSeg:', filename)
         masks, rows, cols = segmenter.segment_image(nuclear_image)
 
         print('Stitching:', filename)
@@ -86,11 +95,20 @@ def main():
             continue
 
         print('Growing cells by', growth, 'pixels:', filename)
-        stitched_mask.grow_by(growth)
-        stitched_mask.binarydilate(growth)
-        print('Removing overlaps by nearest neighbor:', filename)
-        stitched_mask.remove_conflicts_nn()
-        print('applyring XY offset', filename)
+        if cf.USE_SEQUENTIAL_GROWTH:
+            print('Sequential growth selected')
+            stitched_mask.grow_by(0)
+            print('Removing overlaps by nearest neighbor:', filename)
+            stitched_mask.remove_overlaps_nearest_neighbors()
+            stitched_mask.new_grow_by(growth)
+            #print('Applying XY offset', filename)
+        else:
+            #stitched_mask.binarydilate(growth)
+            #stitched_mask.remove_conflicts_nn()
+            stitched_mask.grow_by(growth)
+            print('Removing overlaps by nearest neighbor:', filename)
+            stitched_mask.remove_overlaps_nearest_neighbors()
+        #    print('Applying XY offset', filename)
         
         #record masks as flattened array
         stitched_mask.flatten_masks()
@@ -129,12 +147,12 @@ def main():
                 reg, tile_row, tile_col, tile_z = cvutils.extract_tile_information(
                     filename)
             channel_means, size = None, None
-#            if cf.SHOULD_COMPENSATE == True:
+
             channel_means_comp, channel_means_uncomp, size = stitched_mask.compute_channel_means_sums_compensated(image)
-#            else:
+
             centroids = stitched_mask.compute_centroids()
             absolutes = stitched_mask.absolute_centroids(tile_row, tile_col)
-
+            semi_dataframe_comp = 1
             if centroids.size != 0:
                 metadata_list = np.array([reg, tile_row, tile_col, tile_z])
                 metadata = np.broadcast_to(
@@ -142,6 +160,8 @@ def main():
 
                 semi_dataframe = np.concatenate(
                     [metadata, centroids, absolutes, size[:, None], channel_means_uncomp], axis=1)
+                semi_dataframe_comp = np.concatenate(
+                    [metadata, centroids, absolutes, size[:, None], channel_means_comp], axis=1)
 
             descriptive_labels = [
                 'Reg',
@@ -160,13 +180,46 @@ def main():
                 n_channels = cf.SHAPE[2]
                 if n_channels == 3:
                     cf.CHANNEL_NAMES = ['Red', 'Green', 'Blue']
-            columns = descriptive_labels + [s + "_UNcomp" for s in cf.CHANNEL_NAMES]
-            dataframe = pd.DataFrame(semi_dataframe, columns=columns)
-
-            path = os.path.join(cf.QUANTIFICATION_OUTPUT_PATH, filename[:-4]+ 'statistics_growth' + str(growth))
-            dataframe.to_csv(path + '.csv')
-            # Output to .fcs file
-            #fcswrite.write_fcs(path + '.fcs', columns, full_df_array)
-
+            columns = descriptive_labels + [s for s in cf.CHANNEL_NAMES]
+            dataframe = None
+            path = ''
+            regname = filename.split("_")[0]
+            if cf.SHOULD_COMPENSATE:
+                dataframe = pd.DataFrame(semi_dataframe_comp, columns=columns)
+                path = os.path.join(cf.QUANTIFICATION_OUTPUT_PATH, regname + '_statistics_growth' + str(growth)+'_comp')
+            else:
+                dataframe = pd.DataFrame(semi_dataframe, columns=columns)
+                path = os.path.join(cf.QUANTIFICATION_OUTPUT_PATH, regname + '_statistics_growth' + str(growth)+'_uncomp')
+            if os.path.exists(path+'.csv'):
+                dataframe.to_csv(path + '.csv',mode='a',header=False)
+            else:
+                dataframe.to_csv(path + '.csv')
+            
+        #save intermediate progress in case of mid-run crash
+        with open(cf.PROGRESS_TABLE_PATH, "a") as myfile:
+            myfile.write(filename + "\n")
+            
+    #duplicate existing csv files in fcs format at the end of run
+    if cf.OUTPUT_METHOD == 'statistics' or cf.OUTPUT_METHOD == 'all':
+        print("Duplicating existing csv files in fcs format")
+        descriptive_labels = [
+            'Reg',
+            'Tile Row',
+            'Tile Col',
+            'Tile Z',
+            'In-Tile Y',
+            'In-Tile X',
+            'Absolute Y',
+            'Absolute X',
+            'Cell Size'
+        ]
+        columns = descriptive_labels + [s for s in cf.CHANNEL_NAMES]
+        filenames = os.listdir(cf.QUANTIFICATION_OUTPUT_PATH)
+        for filename in filenames:
+            path = os.path.join(cf.QUANTIFICATION_OUTPUT_PATH,filename)
+            dataframe = pd.read_csv(path,index_col=0)
+            path = path.replace('.csv','')
+            fcswrite.write_fcs(path + '.fcs', columns, dataframe)
+    print("Segmentation Completed")
 if __name__ == "__main__":
     main()
