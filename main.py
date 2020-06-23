@@ -59,6 +59,21 @@ def main():
     cf.FILENAMES = [item for item in cf.FILENAMES if item not in progress_table]
     cf.FILENAMES.sort()
     
+    if cf.BOOST == 'auto':
+        path = os.path.join(cf.DIRECTORY_PATH, cf.AUTOBOOST_REFERENCE_IMAGE)
+        image = np.array(cf.READ_METHOD(path))
+        if cf.IS_CODEX_OUTPUT:
+            image = np.transpose(image, (2, 3, 0, 1))
+        image = image.reshape(cf.SHAPE)
+        nuclear_index = None
+        if cf.N_DIMS == 4:
+            nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
+        nuclear_image = cvutils.get_nuclear_image(cf.N_DIMS-1, image, nuclear_index=nuclear_index)
+        print('Using auto boosting - may be inaccurate for empty or noisy images.')
+        image_max = np.percentile(nuclear_image, cf.AUTOBOOST_PERCENTILE)
+        cf.BOOST = cvutils.EIGHT_BIT_MAX / image_max
+        print('Boosting with value of', cf.BOOST, ', check that this makes sense.')
+    
     count = 0
 
     for filename in cf.FILENAMES:
@@ -73,12 +88,6 @@ def main():
         if cf.N_DIMS == 4:
             nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
         nuclear_image = cvutils.get_nuclear_image(cf.N_DIMS-1, image, nuclear_index=nuclear_index)
-
-        if cf.BOOST == 'auto':
-            print('Using auto boosting - may be inaccurate for empty or noisy images.')
-            image_max = np.percentile(nuclear_image, cf.AUTOBOOST_PERCENTILE)
-            cf.BOOST = cvutils.EIGHT_BIT_MAX / image_max
-            print('Boosting with value of', cf.BOOST, ', check that this makes sense.')
 
         nuclear_image = cvutils.boost_image(nuclear_image, cf.BOOST)
 
