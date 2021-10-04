@@ -109,15 +109,12 @@ def main():
             stitched_mask.grow_by(0)
             print('Removing overlaps by nearest neighbor:', filename)
             stitched_mask.remove_overlaps_nearest_neighbors()
-            stitched_mask.new_grow_by(growth)
-            #print('Applying XY offset', filename)
+            stitched_mask.newbinarydilate(growth)
         else:
-            #stitched_mask.binarydilate(growth)
-            #stitched_mask.remove_conflicts_nn()
-            stitched_mask.grow_by(growth)
+            stitched_mask.grow_by(0)
+            stitched_mask.newbinarydilate(growth)
             print('Removing overlaps by nearest neighbor:', filename)
             stitched_mask.remove_overlaps_nearest_neighbors()
-        #    print('Applying XY offset', filename)
         
         #record masks as flattened array
         stitched_mask.flatten_masks()
