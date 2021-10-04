@@ -244,6 +244,48 @@ class CVMask():
             masks[:,:,i] = binary_dilation(masks[:,:,i],structure =struc)
         self.masks = masks
 #         return masks
+    
+    def newbinarydilate(self, growth):
+        Y, X, N = self.masks.shape
+        masks = self.masks
+        prevmaskregs = np.any(masks, axis = 2)
+        #print(prevmaskregs.shape)
+        #print(Y)
+        #print(X)
+
+        for _ in range(growth):
+            for i in range(N):
+                struc = disk(1)
+                currmask = masks[:,:,i]
+                
+                mins = self.bb_mins[i]
+                maxes = self.bb_maxes[i]
+                
+                minX, minY, maxX, maxY = mins[0] - 2*growth, mins[1] - 2*growth, maxes[0] + 2*growth, maxes[1] + 2*growth
+                if minX < 0: minX = 0
+                if minY < 0: minY = 0
+                if maxX >= X: maxX = X - 1
+                if maxY >= Y: maxY = Y - 1
+                
+                
+                masksnippet = currmask[minY:maxY, minX:maxX]
+                prevmasksnippet = prevmaskregs[minY:maxY, minX:maxX]
+                prevmasksnippet = prevmasksnippet & (~masksnippet)
+                dilated_mask = binary_dilation(masksnippet, structure = struc)
+                overlap_regs_rem = dilated_mask ^ prevmasksnippet
+                trimmed_snippet = overlap_regs_rem & dilated_mask
+                prevmasksnippet = trimmed_snippet | prevmasksnippet
+                prevmaskregs[minY:maxY, minX:maxX] = prevmasksnippet
+                masks[minY:maxY, minX:maxX, i] = trimmed_snippet
+                
+                #prevmaskregs[minY:maxY, minX:maxX] = ~snippet
+                #dilated_mask = binary_dilation(currmask, structure = struc)
+                #overlap_regs_rem = dilated_mask ^ prevmaskregs
+                #trimmed_mask = overlap_regs_rem & dilated_mask
+                #prevmaskregs = trimmed_mask | prevmaskregs
+                #masks[:,:,i] = trimmed_mask
+                
+        self.masks = masks
 
     def remove_conflicts_nn(self):
         from sklearn.neighbors import NearestNeighbors
