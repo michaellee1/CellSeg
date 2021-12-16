@@ -7,6 +7,10 @@ from scipy.linalg import lstsq
 from scipy.spatial import distance
 from operator import itemgetter
 from skimage.measure import find_contours
+from skimage.morphology import disk
+from scipy.ndimage.morphology import binary_dilation
+import pandas as pd
+import sys
 
 IMAGEJ_BAND_WIDTH = 200
 EIGHT_BIT_MAX = 255
@@ -34,40 +38,6 @@ class CVMask():
     def get_centroid(Y, X):
         return (np.mean(Y), np.mean(X))
 
-    @staticmethod
-    def expand_snippet(snippet, pixels):
-        y_len,x_len = snippet.shape
-        output = snippet.copy()
-        for _ in range(pixels):
-            for y in range(y_len):
-                for x in range(x_len):
-                    if (y > 0        and snippet[y-1,x]) or \
-                    (y < y_len - 1 and snippet[y+1,x]) or \
-                    (x > 0        and snippet[y,x-1]) or \
-                    (x < x_len - 1 and snippet[y,x+1]): output[y,x] = True
-            snippet = output.copy()
-        return output
-    
-    
-    #expands masks taking into account where collisions will occur
-    @staticmethod
-    def new_expand_snippet(snippet, pixels, pixel_mask):
-        y_len,x_len = snippet.shape
-        output = snippet.copy()
-        for _ in range(pixels):
-            for y in range(y_len):
-                for x in range(x_len):
-                    if ~pixel_mask[y,x] and ((y > 0 and snippet[y-1,x]) or \
-                    (y < y_len - 1 and snippet[y+1,x]) or \
-                    (x > 0        and snippet[y,x-1]) or \
-                    (x < x_len - 1 and snippet[y,x+1])): output[y,x] = True
-                    if (y > 0 and snippet[y-1,x]): output[y-1,x] = True
-                    if (y < y_len - 1 and snippet[y+1,x]): output[y+1,x] = True
-                    if (x > 0 and snippet[y,x-1]): output[y,x-1] = True
-                    if (x < x_len - 1 and snippet[y,x+1]): output[y,x+1] = True
-            snippet = output.copy()
-        return output
-    
     def n_instances(self):
         if len(self.masks.shape) < 3:
             return 0
@@ -108,9 +78,12 @@ class CVMask():
             return channel_sums, channel_sums, channel_counts
 
         squashed_image = np.reshape(image, (height*width, n_channels))
-
-        plane_mask = np.max(np.arange(1,n_masks+1, dtype=np.uint16)[None,None,:]*self.masks, axis=2).flatten()
-
+        
+        masklocs = np.nonzero(self.masks)
+        plane_mask = np.zeros((mask_height, mask_width), dtype = np.uint32)
+        plane_mask[masklocs[0], masklocs[1]] = masklocs[2] + 1
+        plane_mask = plane_mask.flatten()
+        
         adjacency_matrix = np.zeros((n_masks, n_masks))
         for i in range(len(plane_mask)):
             self.update_adjacency_matrix(plane_mask, mask_width, mask_height, adjacency_matrix, i)
@@ -119,12 +92,13 @@ class CVMask():
             if mask_val != -1:
                 channel_sums[mask_val.astype(np.int32)] += squashed_image[i]
                 channel_counts[mask_val.astype(np.int32)] += 1
-
+        
+        
         # Normalize adjacency matrix
         for i in range(n_masks):
             adjacency_matrix[i] = adjacency_matrix[i] / (max(adjacency_matrix[i, i], 1) * 2)
             adjacency_matrix[i, i] = 1
-
+        
         means = np.true_divide(channel_sums, channel_counts, out=np.zeros_like(channel_sums, dtype='float'), where=channel_counts!=0)
         results = lstsq(adjacency_matrix, means, overwrite_a=True, overwrite_b=False)
         compensated_means = np.maximum(results[0], np.zeros((1,1)))        
@@ -151,7 +125,7 @@ class CVMask():
         centroids = self.compute_centroids()
         if centroids.size == 0:
             return centroids
-
+        
         absolutes = centroids + offsets
 
         return absolutes
@@ -163,46 +137,15 @@ class CVMask():
             masks[1,:,i] += offset_vector[1]
         return masks
 
-    def grow_by(self, growth):
-        Y, X, N = self.masks.shape
-
-        self.centroids = []
-        self.bb_mins = []
-        self.bb_maxes = []
-
-
-        for i in range(N):
-            mask = self.masks[:, :, i]
-            coords = np.where(mask)
-            minX, minY, maxX, maxY = self.bounding_box(coords[0], coords[1], Y-1, X-1, growth)
-            self.bb_mins.append((minX, minY))
-            self.bb_maxes.append((maxX, maxY))
-            centroid = self.get_centroid(coords[0], coords[1])
-            self.centroids.append(centroid)
+    def compute_centroid_and_boundbox(self):
+        masklocs = np.argwhere(self.masks)
+        maskframe = pd.DataFrame(masklocs[masklocs[:, 2].argsort()], columns = ['x', 'y','z'])
+        self.centroids = maskframe.groupby('z').agg({'x': 'mean', 'y': 'mean'}).to_records(index = False).tolist()
+        self.bb_mins = maskframe.groupby('z').agg({'x': 'min', 'y': 'min'}).to_records(index = False).tolist()
+        self.bb_maxes = maskframe.groupby('z').agg({'x': 'max', 'y': 'max'}).to_records(index = False).tolist()
 
     #grows masks by 1 pixel sequentially by first creating a temporary mask A expanded by 1 pixel, recording the collisions B, then taking the set difference A-B. Implicitly assumes that all masks in input are nonoverlapping
-    
-    def new_grow_by(self, growth):
-        
-        Y, X, N = self.masks.shape
 
-        for _ in range(growth):
-            for i in range(N):
-                mask = self.masks[:, :, i]
-                mins = self.bb_mins[i]
-                maxes = self.bb_maxes[i]
-                minX, minY, maxX, maxY = mins[0],mins[1],maxes[0],maxes[1]
-                snippet = mask[minY:maxY,minX:maxX]
-                all_snippets = self.masks[minY:maxY,minX:maxX,:].copy()
-                subY,subX,subN = all_snippets.shape
-                pixel_masks = np.zeros(snippet.shape,dtype=bool)
-                temp_snippet = self.new_expand_snippet(snippet,1,pixel_masks)
-                all_snippets[:,:,i] = temp_snippet
-                pixel_masks = (np.sum(all_snippets.astype(int),axis=2) > 1)
-                new_snippet = self.new_expand_snippet(snippet,1,pixel_masks)
-                mask[minY:maxY,minX:maxX] = new_snippet  
-       # self.masks = mask
-        
             
     def remove_overlaps_nearest_neighbors(self):
         Y, X, N = self.masks.shape
@@ -213,6 +156,7 @@ class CVMask():
                 pixel_masks = np.where(self.masks[y, x, :])[0]
                 if len(pixel_masks) == 2:
                     collisions.append(pixel_masks)
+
         for collision in collisions:
             c1, c2 = collision[0], collision[1]
             minX, minY = np.minimum(np.array(self.bb_mins[c1]), np.array(self.bb_mins[c2]))
@@ -233,30 +177,40 @@ class CVMask():
                 else:
                     self.masks[y_offset, x_offset, c2] = False
              
-    def binarydilate(self,pixels=1):
-        masks = self.masks
-        from skimage.morphology import disk
-        from scipy.ndimage.morphology import binary_dilation
-        struc = disk(pixels)
+    def binarydilate(self, growth):
+        Y, X, N = self.masks.shape
+        
+        struc = disk(growth)
 
         #binary dilate each mask
-        for i in range(masks.shape[2]):
-            masks[:,:,i] = binary_dilation(masks[:,:,i],structure =struc)
-        self.masks = masks
-#         return masks
+        for i in range(N):
+            currmask = self.masks[:,:,i]
+                
+            mins = self.bb_mins[i]
+            maxes = self.bb_maxes[i]
+
+            minX, minY, maxX, maxY = mins[0] - 2*growth, mins[1] - 2*growth, maxes[0] + 2*growth, maxes[1] + 2*growth
+            if minX < 0: minX = 0
+            if minY < 0: minY = 0
+            if maxX >= X: maxX = X - 1
+            if maxY >= Y: maxY = Y - 1
+
+
+            masksnippet = currmask[minY:maxY, minX:maxX]
+            dilated_mask = binary_dilation(masksnippet, structure = struc)
+            self.masks[minY:maxY, minX:maxX, i] = dilated_mask
+            
     
     def newbinarydilate(self, growth):
         Y, X, N = self.masks.shape
-        masks = self.masks
-        prevmaskregs = np.any(masks, axis = 2)
-        #print(prevmaskregs.shape)
-        #print(Y)
-        #print(X)
+
+        prevmaskregs = np.any(self.masks, axis = 2)
+
 
         for _ in range(growth):
             for i in range(N):
                 struc = disk(1)
-                currmask = masks[:,:,i]
+                currmask = self.masks[:,:,i]
                 
                 mins = self.bb_mins[i]
                 maxes = self.bb_maxes[i]
@@ -276,16 +230,8 @@ class CVMask():
                 trimmed_snippet = overlap_regs_rem & dilated_mask
                 prevmasksnippet = trimmed_snippet | prevmasksnippet
                 prevmaskregs[minY:maxY, minX:maxX] = prevmasksnippet
-                masks[minY:maxY, minX:maxX, i] = trimmed_snippet
+                self.masks[minY:maxY, minX:maxX, i] = trimmed_snippet
                 
-                #prevmaskregs[minY:maxY, minX:maxX] = ~snippet
-                #dilated_mask = binary_dilation(currmask, structure = struc)
-                #overlap_regs_rem = dilated_mask ^ prevmaskregs
-                #trimmed_mask = overlap_regs_rem & dilated_mask
-                #prevmaskregs = trimmed_mask | prevmaskregs
-                #masks[:,:,i] = trimmed_mask
-                
-        self.masks = masks
 
     def remove_conflicts_nn(self):
         from sklearn.neighbors import NearestNeighbors
@@ -312,13 +258,6 @@ class CVMask():
 
         self.masks = m_changed
         #return m_changed
-    def flatten_masks(self):
-        flat_masks = self.masks.copy().astype(np.uint32)
-
-        for i in range(flat_masks.shape[2]):
-            r,c = np.where(flat_masks[:,:,i]==1)
-            flat_masks[r,c,i] = i
-        self.flat_masks = flat_masks.sum(2)
 
     def sort_into_strips(self):
         N = self.n_instances()
@@ -369,6 +308,3 @@ class CVMask():
                     line += str(Y[i][k]) + " "
                 line = line.strip() + "\n"
                 f.write(line)
-
-    # def compute_statistics(self, image):
-

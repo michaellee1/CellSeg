@@ -11,6 +11,8 @@ import src.cvmodel as modellib
 import random
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import time
+import sys
 
 from keras import backend as K
 from src.cvmodelconfig import CVSegmentationConfig
@@ -18,6 +20,7 @@ from src.cvmodelconfig import CVSegmentationConfig
 AUTOSIZE_MAX_SIZE = 800
 # Maps image height, width to nrows, ncols to slice into for inference.
 IMAGE_GRID = {
+    (9072,9408):(14,14),
     (1440,1344):(2,2),
     (1440,1920):(2,2),
     (1008,1344):(1,2),
@@ -67,24 +70,38 @@ class CVSegmenter:
     
     def crop_with_overlap(self, arr):
         crop_height, crop_width, channels = arr.shape[0]//self.nrows, arr.shape[1]//self.ncols, arr.shape[2] 
-        
         crops = []
         for row in range(self.nrows):
             for col in range(self.ncols):
                 x1, y1, x2, y2 = col*crop_width, row*crop_height, (col+1)*crop_width, (row+1)*crop_height
                 x1, x2, y1, y2 = self.get_overlap_coordinates(self.nrows, self.ncols, row, col, x1, x2, y1, y2)
                 crops.append(arr[y1:y2, x1:x2, :])
-
+        print("Dividing image into", len(crops), "crops with", self.nrows, "rows and", self.ncols, "columns")
         return crops, self.nrows, self.ncols
     
     def segment_image(self, nuclear_image):
         crops, self.rows, self.cols = self.crop_with_overlap(nuclear_image)
-
         masks = []
-        for crop in crops:
-            results = self.model.detect([crop], verbose=0)[0]
-            mask = results['masks']
-            if mask.shape[2] == 0:
-                print('Warning: no cell instances were detected for a crop.')
-            masks.append(mask)
-        return masks, self.rows, self.cols
+        for row in range(self.rows):
+            for col in range(self.cols):
+                start = time.time()
+                crop = crops[row*self.cols + col]
+                results = self.model.detect([crop], verbose=0)[0]
+                mask = results['masks']
+                #mask = mask[:, :, 1:]
+                if mask.shape[2] == 0:
+                    print('Warning: no cell instances were detected for a crop.')
+                nmasks = mask.shape[2]
+                maskarr = []
+                if nmasks > 0:
+                    maskarr = np.zeros((mask[0].shape[0], mask[0].shape[1]), dtype = np.int32)
+                    maskarr = np.max(np.arange(1, nmasks + 1, dtype=np.int32)[None,None,:]*mask, axis=2)
+                else:
+                    ypix, xpix, _ = mask.shape
+                    maskarr = np.zeros((ypix, xpix), dtype = np.int32)
+                    
+                masks.append(maskarr)
+                stop = time.time()
+                print(f"Segmented crop in {stop-start} seconds.")
+
+        return masks, self.rows, self.cols    

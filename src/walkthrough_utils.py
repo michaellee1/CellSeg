@@ -1,4 +1,9 @@
+# walkthrough_utils.py
+# ---------------------------
+# Utilities for jupyter notebook walkthrough.  See class doc for details.
+
 from src import cvutils
+from src import fcswrite
 from PIL import Image
 import pandas as pd
 import skimage
@@ -27,16 +32,15 @@ def compute_stats(grown_masks, cur_im_name, image, IS_CODEX_OUTPUT, CHANNEL_NAME
         raise NameError(
             "CSV_OR_FCS parameter must be one of csv or fcs")
     
-    grown_masks.flatten_masks()
     print('Calculating statistics:', cur_im_name)
     reg, tile_row, tile_col, tile_z = 0, 1, 1, 0
     if IS_CODEX_OUTPUT:
         reg, tile_row, tile_col, tile_z = cvutils.extract_tile_information(
             cur_im_name)
     channel_means, size = None, None
-
+    
     channel_means_comp, channel_means_uncomp, size = grown_masks.compute_channel_means_sums_compensated(image)
-
+    
     centroids = grown_masks.compute_centroids()
     absolutes = grown_masks.absolute_centroids(tile_row, tile_col)
     semi_dataframe_comp = 1
@@ -65,7 +69,7 @@ def compute_stats(grown_masks, cur_im_name, image, IS_CODEX_OUTPUT, CHANNEL_NAME
     # Output to CSV
     if not IS_CODEX_OUTPUT:
         CHANNEL_NAMES = ['single-channel']
-        n_channels = cf.SHAPE[2]
+        n_channels = image.shape[2]
         if n_channels == 3:
             CHANNEL_NAMES = ['Red', 'Green', 'Blue']
     columns = descriptive_labels + [s for s in CHANNEL_NAMES]

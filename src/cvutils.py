@@ -71,7 +71,8 @@ def get_nuclear_image(n_dims, image, nuclear_index=None):
 def meta_from_image(filename):
     # get shape, file_ext, 8 vs 16 bit, boost,
 
-    ext = filename[-3:]
+    ext = filename.split(".")[-1]
+    
     read_method = skimage.external.tifffile.imread if ext == 'tif' else Image.open
     image = np.array(read_method(filename))
 
