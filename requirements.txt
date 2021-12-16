@@ -23,7 +23,7 @@ h5py==2.8.0
 idna==2.8
 ijroi==0.4.0
 imageio==2.5.0
-imgaug==0.2.9
+imgaug==0.2.5
 jedi==0.13.3
 Jinja2==2.10.1
 joblib==0.13.2
@@ -41,7 +41,7 @@ nbconvert==5.5.0
 nbformat==4.4.0
 networkx==2.3
 notebook==6.0.0
-numpy==1.15.4
+numpy==1.16.0
 olefile==0.46
 pandas==0.25.0
 pandocfilters==1.4.2
@@ -92,4 +92,3 @@ werkzeug==0.15.3
 widgetsnbextension==3.5.1
 wrapt==1.11.2
 yarg==0.1.9
-

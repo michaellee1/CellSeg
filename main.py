@@ -20,6 +20,9 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from collections import defaultdict
+import sys
+import time
+import matplotlib.pyplot as plt
 
 def main():
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -87,38 +90,40 @@ def main():
         nuclear_index = None
         if cf.N_DIMS == 4:
             nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
+            
         nuclear_image = cvutils.get_nuclear_image(cf.N_DIMS-1, image, nuclear_index=nuclear_index)
-
         nuclear_image = cvutils.boost_image(nuclear_image, cf.BOOST)
-
+        
         print('\nSegmenting with CellSeg:', filename)
         masks, rows, cols = segmenter.segment_image(nuclear_image)
+        
 
         print('Stitching:', filename)
         stitched_mask = CVMask(stitcher.stitch_masks(masks, rows, cols))
+        
+        del masks
 
         instances = stitched_mask.n_instances()
         print(instances, 'cell masks found by segmenter')
+        
         if instances == 0:
             print('No cells found in', filename, ', skipping to next')
             continue
-
+            
         print('Growing cells by', growth, 'pixels:', filename)
+        
         if cf.USE_SEQUENTIAL_GROWTH:
             print('Sequential growth selected')
-            stitched_mask.grow_by(0)
+            stitched_mask.compute_centroid_and_boundbox()
             print('Removing overlaps by nearest neighbor:', filename)
             stitched_mask.remove_overlaps_nearest_neighbors()
             stitched_mask.newbinarydilate(growth)
         else:
-            stitched_mask.grow_by(0)
-            stitched_mask.newbinarydilate(growth)
+            stitched_mask.compute_centroid_and_boundbox()
+            stitched_mask.binarydilate(growth)
             print('Removing overlaps by nearest neighbor:', filename)
             stitched_mask.remove_overlaps_nearest_neighbors()
-        
-        #record masks as flattened array
-        stitched_mask.flatten_masks()
-        
+            
 
         if not os.path.exists(cf.IMAGEJ_OUTPUT_PATH):
             os.makedirs(cf.IMAGEJ_OUTPUT_PATH)
@@ -149,9 +154,14 @@ def main():
         if cf.OUTPUT_METHOD == 'statistics' or cf.OUTPUT_METHOD == 'all':
             print('Calculating statistics:', filename)
             reg, tile_row, tile_col, tile_z = 0, 1, 1, 0
+            
+            regname = ''
+            
             if cf.IS_CODEX_OUTPUT:
                 reg, tile_row, tile_col, tile_z = cvutils.extract_tile_information(
                     filename)
+                regname = filename.split("_")[0]
+            
             channel_means, size = None, None
 
             channel_means_comp, channel_means_uncomp, size = stitched_mask.compute_channel_means_sums_compensated(image)
@@ -186,10 +196,12 @@ def main():
                 n_channels = cf.SHAPE[2]
                 if n_channels == 3:
                     cf.CHANNEL_NAMES = ['Red', 'Green', 'Blue']
+                regname = filename.replace("." + filename.split(".")[-1], "")
+                
             columns = descriptive_labels + [s for s in cf.CHANNEL_NAMES]
             dataframe = None
             path = ''
-            regname = filename.split("_")[0]
+            
             if cf.SHOULD_COMPENSATE:
                 dataframe = pd.DataFrame(semi_dataframe_comp, columns=columns)
                 path = os.path.join(cf.QUANTIFICATION_OUTPUT_PATH, regname + '_statistics_growth' + str(growth)+'_comp')
@@ -221,6 +233,7 @@ def main():
         ]
         columns = descriptive_labels + [s for s in cf.CHANNEL_NAMES]
         filenames = os.listdir(cf.QUANTIFICATION_OUTPUT_PATH)
+        filenames = [f for f in filenames if f.endswith("csv")]
         for filename in filenames:
             path = os.path.join(cf.QUANTIFICATION_OUTPUT_PATH,filename)
             dataframe = pd.read_csv(path,index_col=0)
