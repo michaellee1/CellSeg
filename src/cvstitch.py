@@ -9,6 +9,7 @@ import time
 from math import ceil
 import matplotlib.pyplot as plt
 import warnings
+import pandas as pd
 
 class CVMaskStitcher():
     """
@@ -148,13 +149,24 @@ class CVMaskStitcher():
         plt.show()
         #warn users if the number of masks discovered in the image will crash the program
         mask_arr_h, mask_arr_w = full_mask_arr.shape
-        expected_memory_gb = mask_arr_h * mask_arr_w * (num_masks + 1) / 1e9
-        if expected_memory_gb > self.memory_max:
-            warnings.warn(f"The number of masks found and dimensions of image will cause program to exceed {self.memory_max + 1} GB memory usage. Consider splitting image into subtiles and segmenting them individually.", UserWarning)
+        #expected_memory_gb = mask_arr_h * mask_arr_w * (num_masks + 1) / 1e9
+        #if expected_memory_gb > self.memory_max:
+        #    warnings.warn(f"The number of masks found and dimensions of image will cause program to exceed {self.memory_max + 1} GB memory usage. Consider splitting image into subtiles and segmenting them individually.", UserWarning)
         
-        expanded_masks = self.flat_to_expanded(full_mask_arr)
+        #expanded_masks = self.flat_to_expanded(full_mask_arr)
+        
+        #renumber the indices before returning array
+        indices = np.nonzero(full_mask_arr)
+        values = full_mask_arr[indices]
+        valframe = pd.DataFrame(np.transpose(np.array([indices[0], indices[1], values]))).rename(columns = {0:"x", 1:"y", 2:"idx"})
+        valframe = valframe.sort_values(by = 'idx')
+        num_idx = valframe['idx'].value_counts(sort = False).sort_index().tolist()
+        valframe['idx'] = np.repeat(np.arange(1, num_masks + 1), num_idx)
+        valarray = valframe.to_numpy()
+        full_mask_arr[valarray[:, 0], valarray[:, 1]] = valarray[:, 2]
 
-        return expanded_masks
+        #return expanded_masks
+        return full_mask_arr
 
     # Remove any cells smaller than the defined threshold.
     def remove_small_cells(self, mask):

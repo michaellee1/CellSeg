@@ -11,6 +11,7 @@ import itertools
 import colorsys
 import cv2
 import imageio
+import pandas as pd
 
 import numpy as np
 from skimage.measure import find_contours
@@ -19,6 +20,8 @@ from matplotlib import patches,  lines
 from matplotlib.patches import Polygon
 from matplotlib.ticker import NullLocator
 import IPython.display
+from scipy.ndimage.morphology import binary_dilation, binary_erosion
+from skimage.morphology import disk
 
 # Root directory of the project
 ROOT_DIR = os.path.abspath("../")
@@ -30,6 +33,136 @@ import src.cvutils as utils
 ############################################################
 #  Visualization
 ############################################################
+
+def get_bounding_box(masks):
+    indices = np.where(masks != 0)
+    values = masks[indices[0], indices[1]]
+    maskframe = pd.DataFrame(np.transpose(np.array([indices[0], indices[1], values]))).rename(columns = {0:"y", 1:"x", 2:"id"})
+    bb_mins = maskframe.groupby('id').agg({'y': 'min', 'x': 'min'}).to_records(index = False).tolist()
+    bb_maxes = maskframe.groupby('id').agg({'y': 'max', 'x': 'max'}).to_records(index = False).tolist()
+    
+    return bb_mins, bb_maxes
+
+def extract_snippet(Y, X, masks, mins, maxes):
+    
+    minY, minX, maxY, maxX = compute_snippet_bounds(mins[0] - 1, mins[1] - 1, maxes[0] + 1, maxes[1] + 1, Y, X)
+        
+    return masks[(minY):(maxY), (minX):(maxX)], minY, minX, maxY, maxX
+
+def compute_snippet_bounds(minY, minX, maxY, maxX, Y, X):
+    if minX < 0: minX = 0
+    if minY < 0: minY = 0
+    if maxX >= X: maxX = X - 1
+    if maxY >= Y: maxY = Y - 1
+        
+    return minY, minX, maxY, maxX
+
+def get_mask_ids(masks):
+    maskids = list(np.unique(masks))
+    maskids.remove(0)
+    maskids.sort()
+    
+    return maskids
+
+def random_colors(N, bright=True):
+    """
+    Generate random colors.
+    To get visually distinct colors, generate them in HSV space then
+    convert to RGB.
+    """
+    brightness = 1.0 if bright else 0.7
+    hsv = [(i / N, 1, brightness) for i in range(N)]
+    colors = list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv))
+    colors = [(int(i[0] * 255), int(i[1] * 255), int(i[2] * 255)) for i in colors]
+    random.shuffle(colors)
+    return colors
+    
+
+def generate_mask_outlines(masks):
+    
+    #first compute bounding boxes
+    maskids = get_mask_ids(masks)
+    num_masks = len(maskids)
+
+    bb_mins, bb_maxes = get_bounding_box(masks)
+
+    Y, X = masks.shape
+
+    output_im = np.zeros(masks.shape, dtype = np.uint32)
+
+    struc = disk(1)
+    for i, maskid in enumerate(maskids):
+
+        currreg, minY, minX, maxY, maxX = extract_snippet(Y, X, masks, bb_mins[i], bb_maxes[i])
+
+        mask_snippet = (currreg == maskid)
+        interior = binary_erosion(mask_snippet, struc)
+        boundary = mask_snippet ^ interior
+
+        pix_to_update = np.nonzero(boundary)
+
+        pix_X = np.array([min(j + minX, X) for j in pix_to_update[1]])
+        pix_Y = np.array([min(j + minY, Y) for j in pix_to_update[0]])
+
+        output_im[pix_Y, pix_X] = maskid
+
+    return output_im
+    
+def overlay_outlines_and_save(image, masks, outputpath, figsize, colors = None):
+    
+    auto_show = False
+    _, ax = plt.subplots(1, figsize=figsize)
+
+    maskids = get_mask_ids(masks)
+    num_masks = len(maskids)
+
+    # Generate random colors
+    colors = colors or random_colors(num_masks)
+
+    bb_mins, bb_maxes = get_bounding_box(masks)
+
+    #rgb_im = cv2.cvtColor(nimage, cv2.COLOR_GRAY2RGB)
+    rgb_im = image
+
+    rgb_im = rgb_im.astype(np.uint8)
+
+    Y, X = masks.shape
+
+    for i, maskid in enumerate(maskids):
+
+        currreg, minY, minX, maxY, maxX = extract_snippet(Y, X, masks, bb_mins[i], bb_maxes[i])
+        mask_snippet = (currreg == maskid)
+
+
+        color = colors[i]
+        #if i < 10:
+        #    print(color)
+        #    plt.imshow(mask_snippet)
+       #     plt.show()
+       #     plt.close()
+        pix_to_update = np.nonzero(mask_snippet)
+
+        #minY, minX, maxY, maxX = compute_snippet_bounds(bb_mins[i][0] - 1, bb_mins[i][1] - 1, bb_maxes[i][0] + 1, bb_maxes[i][1] + 1, Y, X)
+
+        pix_X = np.array([min(j + minX, X) for j in pix_to_update[1]])
+        pix_Y = np.array([min(j + minY, Y) for j in pix_to_update[0]])
+
+        rgb_im[pix_Y, pix_X, :] = color
+        #rgb_im[pix_Y, pix_X, 1] = 255
+        #rgb_im[pix_Y, pix_X, 2] = 255
+
+    ax.axis('off')
+    img = ax.imshow(rgb_im)
+    # This is needed to remove all whitespace
+    plt.gca().set_axis_off()
+    plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
+                hspace = 0, wspace = 0)
+    plt.margins(0,0)
+    plt.gca().xaxis.set_major_locator(NullLocator())
+    plt.gca().yaxis.set_major_locator(NullLocator())
+    plt.savefig(outputpath, dpi=75)
+    plt.close()
+    
 
 def display_images(images, titles=None, cols=4, cmap=None, norm=None,
                    interpolation=None):
@@ -53,19 +186,6 @@ def display_images(images, titles=None, cols=4, cmap=None, norm=None,
                    norm=norm, interpolation=interpolation)
         i += 1
     plt.show()
-
-
-def random_colors(N, bright=True):
-    """
-    Generate random colors.
-    To get visually distinct colors, generate them in HSV space then
-    convert to RGB.
-    """
-    brightness = 1.0 if bright else 0.7
-    hsv = [(i / N, 1, brightness) for i in range(N)]
-    colors = list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv))
-    random.shuffle(colors)
-    return colors
 
 
 def apply_mask(image, mask, color, alpha=0.5):
@@ -270,7 +390,17 @@ def generate_instances_and_save(path, image, masks,
                       colors=None, captions=None):
 
     # Number of instances
-    N = masks.shape[2]
+    #N = masks.shape[2]
+    
+    nlayers = 10
+    
+    expanded_masks = np.zeros((masks.shape[0], masks.shape[1], nlayers), np.uint32)
+    
+    for i in range(nlayers):
+        pos = np.nonzero(np.mod(masks, i) == 0)
+        vals = masks[pos[0], pos[1]]
+        expanded_masks[pos[0], pos[1]] = vals
+    
 
     # If no axis is passed, create one and automatically call show()
     auto_show = False
@@ -282,11 +412,11 @@ def generate_instances_and_save(path, image, masks,
     # Show area outside image boundaries.
     # ax.set_title(title)
 
-    for i in range(N):
+    for i in range(nlayers):
         color = colors[i]
 
         # Mask
-        mask = masks[:, :, i]
+        mask = expanded_masks[:, :, i]
 
         # Mask Polygon
         # Pad to ensure proper polygons for masks that touch image edges.

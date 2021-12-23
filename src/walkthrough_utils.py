@@ -41,18 +41,18 @@ def compute_stats(grown_masks, cur_im_name, image, IS_CODEX_OUTPUT, CHANNEL_NAME
     
     channel_means_comp, channel_means_uncomp, size = grown_masks.compute_channel_means_sums_compensated(image)
     
-    centroids = grown_masks.compute_centroids()
+    centroids = grown_masks.centroids
     absolutes = grown_masks.absolute_centroids(tile_row, tile_col)
     semi_dataframe_comp = 1
-    if centroids.size != 0:
+    if centroids:
         metadata_list = np.array([reg, tile_row, tile_col, tile_z])
         metadata = np.broadcast_to(
             metadata_list, (grown_masks.n_instances(), len(metadata_list)))
 
         semi_dataframe = np.concatenate(
-            [metadata, centroids, absolutes, size[:, None], channel_means_uncomp], axis=1)
+            [metadata, np.array(centroids), absolutes, size[:, None], channel_means_uncomp], axis=1)
         semi_dataframe_comp = np.concatenate(
-            [metadata, centroids, absolutes, size[:, None], channel_means_comp], axis=1)
+            [metadata, np.array(centroids), absolutes, size[:, None], channel_means_comp], axis=1)
 
     descriptive_labels = [
         'Reg',

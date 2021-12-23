@@ -7,10 +7,12 @@ from scipy.linalg import lstsq
 from scipy.spatial import distance
 from operator import itemgetter
 from skimage.measure import find_contours
-from skimage.morphology import disk
+from skimage.morphology import disk, dilation
 from scipy.ndimage.morphology import binary_dilation
 import pandas as pd
 import sys
+from sklearn.neighbors import kneighbors_graph
+from scipy.spatial.distance import cdist
 
 IMAGEJ_BAND_WIDTH = 200
 EIGHT_BIT_MAX = 255
@@ -21,27 +23,13 @@ class CVMask():
     The class provides functions to grow, remove overlaps (nearest neighbors), and export to various
     formats.  All methods that change the masks modify the masks stored in the .masks property
     '''
-    def __init__(self, masks):
-        self.masks = masks
+    def __init__(self, flatmasks):
+        self.masks = None
+        self.flatmasks = flatmasks
         self.centroids = None
 
-    @staticmethod
-    def bounding_box(Y, X, max_y, max_x, growth):
-        minX = np.maximum(0, np.min(X) - growth)
-        minY = np.maximum(0, np.min(Y) - growth)
-        maxY = np.minimum(max_y, np.max(Y) + growth)
-        maxX = np.minimum(max_x, np.max(X) + growth)
-
-        return (minX, minY, maxX, maxY)
-
-    @staticmethod
-    def get_centroid(Y, X):
-        return (np.mean(Y), np.mean(X))
-
     def n_instances(self):
-        if len(self.masks.shape) < 3:
-            return 0
-        return self.masks.shape[2]
+        return len(np.unique(self.flatmasks)) - 1
 
     def update_adjacency_value(self, adjacency_matrix, original, neighbor):
         border = False
@@ -71,7 +59,8 @@ class CVMask():
 
     def compute_channel_means_sums_compensated(self, image):
         height, width, n_channels = image.shape
-        mask_height, mask_width, n_masks = self.masks.shape
+        mask_height, mask_width = self.flatmasks.shape
+        n_masks = len(np.unique(self.flatmasks)) - 1
         channel_sums = np.zeros((n_masks, n_channels))
         channel_counts = np.zeros((n_masks, n_channels))
         if n_masks == 0:
@@ -79,10 +68,11 @@ class CVMask():
 
         squashed_image = np.reshape(image, (height*width, n_channels))
         
-        masklocs = np.nonzero(self.masks)
-        plane_mask = np.zeros((mask_height, mask_width), dtype = np.uint32)
-        plane_mask[masklocs[0], masklocs[1]] = masklocs[2] + 1
-        plane_mask = plane_mask.flatten()
+        #masklocs = np.nonzero(self.flatmasks)
+        #plane_mask = np.zeros((mask_height, mask_width), dtype = np.uint32)
+        #plane_mask[masklocs[0], masklocs[1]] = masklocs[2] + 1
+        #plane_mask = plane_mask.flatten()
+        plane_mask = self.flatmasks.flatten()
         
         adjacency_matrix = np.zeros((n_masks, n_masks))
         for i in range(len(plane_mask)):
@@ -106,158 +96,156 @@ class CVMask():
         return compensated_means, means, channel_counts[:,0]
 
     def compute_centroids(self):
-        if self.centroids is None:
-            self.centroids = []
-            for i in range(self.n_instances()):
-                mask = self.masks[:, :, i]
-                coords = np.where(mask)
-                centroid = self.get_centroid(coords[0], coords[1])
-                self.centroids.append(centroid)
+        masks = self.flatmasks
+        num_masks = len(np.unique(masks)) - 1
+        indices = np.where(masks != 0)
+        values = masks[indices[0], indices[1]]
 
-        return np.array(self.centroids)
+        maskframe = pd.DataFrame(np.transpose(np.array([indices[0], indices[1], values]))).rename(columns = {0:"x", 1:"y", 2:"id"})
+        centroids = maskframe.groupby('id').agg({'x': 'mean', 'y': 'mean'}).to_records(index = False).tolist()
+        
+        self.centroids = centroids
+        
+        
+    def compute_boundbox(self):
+        masks = self.flatmasks
+        num_masks = len(np.unique(masks)) - 1
+        indices = np.where(masks != 0)
+        values = masks[indices[0], indices[1]]
+
+        maskframe = pd.DataFrame(np.transpose(np.array([indices[0], indices[1], values]))).rename(columns = {0:"y", 1:"x", 2:"id"})
+        self.bb_mins = maskframe.groupby('id').agg({'y': 'min', 'x': 'min'}).to_records(index = False).tolist()
+        self.bb_maxes = maskframe.groupby('id').agg({'y': 'max', 'x': 'max'}).to_records(index = False).tolist()
     
     def absolute_centroids(self, tile_row, tile_col):
-        y_offset = self.masks.shape[0] * (tile_row - 1)
-        x_offset = self.masks.shape[1] * (tile_col - 1)
+        y_offset = self.flatmasks.shape[0] * (tile_row - 1)
+        x_offset = self.flatmasks.shape[1] * (tile_col - 1)
 
-        offsets = np.array([y_offset, x_offset])
+        offsets = [y_offset, x_offset]
 
-        centroids = self.compute_centroids()
-        if centroids.size == 0:
+        centroids = self.centroids
+        if not centroids:
             return centroids
         
-        absolutes = centroids + offsets
+        absolutes = [(cent[0] + offsets[0], cent[1] + offsets[1]) for cent in centroids]
+        
+        absolutes = np.array(absolutes)
 
         return absolutes
     
     def applyXYoffset(masks,offset_vector):
-    #masks = self.masks
+
         for i in range(masks.shape[2]):
             masks[0,:,i] += offset_vector[0]
             masks[1,:,i] += offset_vector[1]
         return masks
-
-    def compute_centroid_and_boundbox(self):
-        masklocs = np.argwhere(self.masks)
-        maskframe = pd.DataFrame(masklocs[masklocs[:, 2].argsort()], columns = ['x', 'y','z'])
-        self.centroids = maskframe.groupby('z').agg({'x': 'mean', 'y': 'mean'}).to_records(index = False).tolist()
-        self.bb_mins = maskframe.groupby('z').agg({'x': 'min', 'y': 'min'}).to_records(index = False).tolist()
-        self.bb_maxes = maskframe.groupby('z').agg({'x': 'max', 'y': 'max'}).to_records(index = False).tolist()
-
-    #grows masks by 1 pixel sequentially by first creating a temporary mask A expanded by 1 pixel, recording the collisions B, then taking the set difference A-B. Implicitly assumes that all masks in input are nonoverlapping
-
             
-    def remove_overlaps_nearest_neighbors(self):
-        Y, X, N = self.masks.shape
-
-        collisions = []
-        for y in range(Y):
-            for x in range(X):
-                pixel_masks = np.where(self.masks[y, x, :])[0]
-                if len(pixel_masks) == 2:
-                    collisions.append(pixel_masks)
-
-        for collision in collisions:
-            c1, c2 = collision[0], collision[1]
-            minX, minY = np.minimum(np.array(self.bb_mins[c1]), np.array(self.bb_mins[c2]))
-            maxX, maxY = np.maximum(np.array(self.bb_maxes[c1]), np.array(self.bb_maxes[c2]))
-            c_pixels = np.where(self.masks[minY:maxY,minX:maxX,c1].astype(bool) & self.masks[minY:maxY,minX:maxX,c2].astype(bool))
-            Y_collision = c_pixels[0]
-            X_collision = c_pixels[1]
-            for i in range(len(Y_collision)):
-                y_offset = minY + Y_collision[i]
-                x_offset = minX + X_collision[i]
-                
-                distance_to_c0 = distance.euclidean((x_offset, y_offset), self.centroids[c1])
-                distance_to_c1 = distance.euclidean((x_offset, y_offset), self.centroids[c2])
-                
-                
-                if distance_to_c0 > distance_to_c1:
-                    self.masks[y_offset, x_offset, c1] = False
-                else:
-                    self.masks[y_offset, x_offset, c2] = False
-             
-    def binarydilate(self, growth):
-        Y, X, N = self.masks.shape
-        
-        struc = disk(growth)
-
-        #binary dilate each mask
-        for i in range(N):
-            currmask = self.masks[:,:,i]
-                
-            mins = self.bb_mins[i]
-            maxes = self.bb_maxes[i]
-
-            minX, minY, maxX, maxY = mins[0] - 2*growth, mins[1] - 2*growth, maxes[0] + 2*growth, maxes[1] + 2*growth
-            if minX < 0: minX = 0
-            if minY < 0: minY = 0
-            if maxX >= X: maxX = X - 1
-            if maxY >= Y: maxY = Y - 1
-
-
-            masksnippet = currmask[minY:maxY, minX:maxX]
-            dilated_mask = binary_dilation(masksnippet, structure = struc)
-            self.masks[minY:maxY, minX:maxX, i] = dilated_mask
-            
-    
-    def newbinarydilate(self, growth):
-        Y, X, N = self.masks.shape
-
-        prevmaskregs = np.any(self.masks, axis = 2)
-
-
-        for _ in range(growth):
-            for i in range(N):
-                struc = disk(1)
-                currmask = self.masks[:,:,i]
-                
-                mins = self.bb_mins[i]
-                maxes = self.bb_maxes[i]
-                
-                minX, minY, maxX, maxY = mins[0] - 2*growth, mins[1] - 2*growth, maxes[0] + 2*growth, maxes[1] + 2*growth
-                if minX < 0: minX = 0
-                if minY < 0: minY = 0
-                if maxX >= X: maxX = X - 1
-                if maxY >= Y: maxY = Y - 1
-                
-                
-                masksnippet = currmask[minY:maxY, minX:maxX]
-                prevmasksnippet = prevmaskregs[minY:maxY, minX:maxX]
-                prevmasksnippet = prevmasksnippet & (~masksnippet)
-                dilated_mask = binary_dilation(masksnippet, structure = struc)
-                overlap_regs_rem = dilated_mask ^ prevmasksnippet
-                trimmed_snippet = overlap_regs_rem & dilated_mask
-                prevmasksnippet = trimmed_snippet | prevmasksnippet
-                prevmaskregs[minY:maxY, minX:maxX] = prevmasksnippet
-                self.masks[minY:maxY, minX:maxX, i] = trimmed_snippet
-                
-
-    def remove_conflicts_nn(self):
-        from sklearn.neighbors import NearestNeighbors
-        #get coordinates of conflicting pixels
-        masks = self.masks
-        conf_r,conf_c = np.where(masks.sum(2)>1)
-        
-        if len(conf_r) < 1: # no conflicts
-            return
-        
-        #centroids of each mask
+    def remove_overlaps_nearest_neighbors(self, masks):
+        final_masks = np.max(masks, axis = 2)
         centroids = self.centroids
-        cen = np.array(centroids)
+        collisions = np.nonzero(np.sum(masks > 0, axis = 2) > 1)
+        collision_masks = masks[collisions]
+        collision_index = np.nonzero(collision_masks)
+        collision_masks = collision_masks[collision_index]
+        collision_frame = pd.DataFrame(np.transpose(np.array([collision_index[0], collision_masks]))).rename(columns = {0:"collis_idx", 1:"mask_id"})
+        grouped_frame = collision_frame.groupby('collis_idx')
+        for collis_idx, group in grouped_frame:
+            collis_pos = np.expand_dims(np.array([collisions[0][collis_idx], collisions[1][collis_idx]]), axis = 0)
+            prevval = final_masks[collis_pos[0,0], collis_pos[0,1]]
+            mask_ids = list(group['mask_id'])
+            curr_centroids = np.array([centroids[mask_id - 1] for mask_id in mask_ids])
+            dists = cdist(curr_centroids, collis_pos)
+            closest_mask = mask_ids[np.argmin(dists)]
+            final_masks[collis_pos[0,0], collis_pos[0,1]] = closest_mask
+        
+        return final_masks
+             
+    def grow_masks(self, growth, method = 'Standard', num_neighbors = 30):
+        assert method in ['Standard', 'Sequential']
+        
+        masks = self.flatmasks
+        num_masks = len(np.unique(masks)) - 1
+        
+        if method == 'Standard':
+            print("Standard growth selected")
+            masks = self.flatmasks
+            num_masks = len(np.unique(masks)) - 1
+            indices = np.where(masks != 0)
+            values = masks[indices[0], indices[1]]
 
-        X = np.stack([conf_r,conf_c]).T
-        nn = NearestNeighbors(n_neighbors=1).fit(cen)
-        dis,idx = nn.kneighbors(n_neighbors =1,X = X)
-        m_changed = masks.copy()
+            maskframe = pd.DataFrame(np.transpose(np.array([indices[0], indices[1], values]))).rename(columns = {0:"x", 1:"y", 2:"id"})
+            cent_array = maskframe.groupby('id').agg({'x': 'mean', 'y': 'mean'}).to_numpy()
+            connectivity_matrix = kneighbors_graph(cent_array, num_neighbors).toarray() * np.arange(1, num_masks + 1)
+            connectivity_matrix = connectivity_matrix.astype(int)
+            labels = {}
+            for n in range(num_masks):
+                connections = list(connectivity_matrix[n, :])
+                connections.remove(0)
+                layers_used = [labels[i] for i in connections if i in labels]
+                layers_used.sort()
+                currlayer = 0
+                for layer in layers_used:
+                    if currlayer != layer: 
+                        break
+                    currlayer += 1
+                labels[n + 1] = currlayer
 
-        #set 0 across all masks at conflicted pixels
-        m_changed[conf_r,conf_c,:] = 0
-        #only at final mask index, set to 1
-        m_changed[conf_r,conf_c,idx[:,0]] = 1
+            possible_layers = len(list(set(labels.values())))
+            label_frame = pd.DataFrame(list(labels.items()), columns = ["maskid", "layer"])
+            image_h, image_w = masks.shape
+            expanded_masks = np.zeros((image_h, image_w, possible_layers), dtype = np.uint32)
 
-        self.masks = m_changed
-        #return m_changed
+            grouped_frame = label_frame.groupby('layer')
+            for layer, group in grouped_frame:
+                currids = list(group['maskid'])
+                masklocs = np.isin(masks, currids)
+                expanded_masks[masklocs, layer] = masks[masklocs]
+
+            dilation_mask = disk(1)
+            grown_masks = np.copy(expanded_masks)
+            for _ in range(growth):
+                for i in range(possible_layers):
+                    grown_masks[:, :, i] = dilation(grown_masks[:, :, i], dilation_mask)
+            self.flatmasks = self.remove_overlaps_nearest_neighbors(grown_masks)
+                
+        elif method == 'Sequential':
+            print("Sequential growth selected")
+            Y, X = masks.shape
+            struc = disk(1)
+            for _ in range(growth):
+                for i in range(num_masks):
+                    mins = self.bb_mins[i]
+                    maxes = self.bb_maxes[i]
+                    minY, minX, maxY, maxX = mins[0] - 3*growth, mins[1] - 3*growth, maxes[0] + 3*growth, maxes[1] + 3*growth
+                    if minX < 0: minX = 0
+                    if minY < 0: minY = 0
+                    if maxX >= X: maxX = X - 1
+                    if maxY >= Y: maxY = Y - 1
+
+                    currreg = masks[minY:maxY, minX:maxX]
+                    mask_snippet = (currreg == i + 1)
+                    full_snippet = currreg > 0
+                    other_masks_snippet = full_snippet ^ mask_snippet
+                    dilated_mask = binary_dilation(mask_snippet, struc)
+                    final_update = (dilated_mask ^ full_snippet) ^ other_masks_snippet
+
+                    #f, axarr = plt.subplots(1, 5)
+                    #plt.imshow(mask_snippet)
+                    #axarr[0].imshow(mask_snippet)
+                    #axarr[1].imshow(full_snippet)
+                    #axarr[2].imshow(other_masks_snippet)
+                    #axarr[3].imshow(dilated_mask)
+                    #axarr[4].imshow(final_update)
+                    #plt.show()
+
+                    pix_to_update = np.nonzero(final_update)
+
+                    pix_X = np.array([min(j + minX, X) for j in pix_to_update[1]])
+                    pix_Y = np.array([min(j + minY, Y) for j in pix_to_update[0]])
+
+                    masks[pix_Y, pix_X] = i + 1
+
+            self.flatmasks = masks
 
     def sort_into_strips(self):
         N = self.n_instances()
