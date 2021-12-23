@@ -23,6 +23,9 @@ from collections import defaultdict
 import sys
 import time
 import matplotlib.pyplot as plt
+from scipy.ndimage import zoom
+from tifffile import imsave
+from sklearn.neighbors import kneighbors_graph
 
 def main():
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -38,6 +41,11 @@ def main():
     print("Working with images of shape:", cf.SHAPE)
 
     stitcher = CVMaskStitcher(overlap=cf.OVERLAP)
+    
+    #imshape = cf.SHAPE
+    #if cf.HALF_RESOLUTION:
+    #    imshape = (round(imshape[0] / 2), round(imshape[1] / 2), imshape[2])
+        
     segmenter = CVSegmenter(
         cf.SHAPE,
         cf.MODEL_PATH,
@@ -101,6 +109,8 @@ def main():
         print('Stitching:', filename)
         stitched_mask = CVMask(stitcher.stitch_masks(masks, rows, cols))
         
+        #inside the stitcher, split the masks back into crops
+        
         del masks
 
         instances = stitched_mask.n_instances()
@@ -112,19 +122,16 @@ def main():
             
         print('Growing cells by', growth, 'pixels:', filename)
         
-        if cf.USE_SEQUENTIAL_GROWTH:
-            print('Sequential growth selected')
-            stitched_mask.compute_centroid_and_boundbox()
-            print('Removing overlaps by nearest neighbor:', filename)
-            stitched_mask.remove_overlaps_nearest_neighbors()
-            stitched_mask.newbinarydilate(growth)
-        else:
-            stitched_mask.compute_centroid_and_boundbox()
-            stitched_mask.binarydilate(growth)
-            print('Removing overlaps by nearest neighbor:', filename)
-            stitched_mask.remove_overlaps_nearest_neighbors()
+        if cf.USE_GROWTH:
+            print("Computing centroids and bounding boxes for the masks.")
+            stitched_mask.compute_centroids()
+            stitched_mask.compute_boundbox()
+            print(f"Growing masks by {cf.GROWTH_PIXELS} pixels")
+            stitched_mask.grow_masks(cf.GROWTH_PIXELS, cf.GROWTH_METHOD)
+        
             
-
+        #restitch and squash after growth
+        
         if not os.path.exists(cf.IMAGEJ_OUTPUT_PATH):
             os.makedirs(cf.IMAGEJ_OUTPUT_PATH)
         if not os.path.exists(cf.VISUAL_OUTPUT_PATH):
@@ -141,17 +148,21 @@ def main():
 
         if cf.OUTPUT_METHOD == 'visual_image_output' or cf.OUTPUT_METHOD == 'all':
             print('Creating visual output saved to', cf.VISUAL_OUTPUT_PATH)
-            new_path = os.path.join(cf.VISUAL_OUTPUT_PATH, filename[:-4]) + 'visual_growth' + str(growth)
+            new_path = os.path.join(cf.VISUAL_OUTPUT_PATH, filename[:-4]) + 'visual_growth' + str(growth) + ".png"
             figsize = (cf.SHAPE[1] // 25, cf.SHAPE[0] // 25)
-            cvvisualize.generate_instances_and_save(
-                new_path + '.png', nuclear_image, stitched_mask.masks[1:,1:,:], figsize=figsize)
+            outlines = cvvisualize.generate_mask_outlines(stitched_mask.flatmasks)
+            
+            cvvisualize.overlay_outlines_and_save(nuclear_image, outlines, new_path, figsize=figsize)
+            
         
         if cf.OUTPUT_METHOD == 'visual_overlay_output' or cf.OUTPUT_METHOD == 'all':
+            
             print('Creating visual overlay output saved to', cf.VISUAL_OUTPUT_PATH)
             new_path = os.path.join(cf.VISUAL_OUTPUT_PATH, filename[:-4]) + 'growth' + str(growth) + 'mask.tif'
-            cvvisualize.generate_masks_and_save(new_path, nuclear_image, stitched_mask.masks[1:,1:,:])
+            outlines = cvvisualize.generate_mask_outlines(stitched_mask.flatmasks)
+            imsave(new_path, outlines)
 
-        if cf.OUTPUT_METHOD == 'statistics' or cf.OUTPUT_METHOD == 'all':
+        if cf.OUTPUT_METHOD == 'statistics' or cf.OUTPUT_METHOD == 'all': #must rewrite this
             print('Calculating statistics:', filename)
             reg, tile_row, tile_col, tile_z = 0, 1, 1, 0
             
@@ -166,18 +177,18 @@ def main():
 
             channel_means_comp, channel_means_uncomp, size = stitched_mask.compute_channel_means_sums_compensated(image)
 
-            centroids = stitched_mask.compute_centroids()
+            centroids = stitched_mask.centroids
             absolutes = stitched_mask.absolute_centroids(tile_row, tile_col)
             semi_dataframe_comp = 1
-            if centroids.size != 0:
+            if centroids:
                 metadata_list = np.array([reg, tile_row, tile_col, tile_z])
                 metadata = np.broadcast_to(
                     metadata_list, (stitched_mask.n_instances(), len(metadata_list)))
 
                 semi_dataframe = np.concatenate(
-                    [metadata, centroids, absolutes, size[:, None], channel_means_uncomp], axis=1)
+                    [metadata, np.array(centroids), absolutes, size[:, None], channel_means_uncomp], axis=1)
                 semi_dataframe_comp = np.concatenate(
-                    [metadata, centroids, absolutes, size[:, None], channel_means_comp], axis=1)
+                    [metadata, np.array(centroids), absolutes, size[:, None], channel_means_comp], axis=1)
 
             descriptive_labels = [
                 'Reg',
