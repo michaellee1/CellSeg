@@ -28,6 +28,13 @@ from tifffile import imsave
 from sklearn.neighbors import kneighbors_graph
 
 def main():
+
+  physical_devices = tf.config.list_physical_devices('GPU')
+  try:
+    for dev in physical_devices:
+      tf.config.experimental.set_memory_growth(dev, True)
+  except: # Invalid device or cannot modify virtual devices once initialized.
+    pass
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     cf = CVConfig()
