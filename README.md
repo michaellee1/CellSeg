@@ -1,6 +1,14 @@
-# CellSeg
+# [CellSeg](https://michaellee1.github.io/CellSegSite/)
 
-GPU-accelerated Nvidia-docker fork of [upstream](https://github.com/michaellee1/CellSeg)
+### Linux containers
+
+CPU docker:
+
+```
+docker pull andrewrech/cellseq-cpu:latest
+```
+
+GPU-accelerated Nvidia-docker:
 
 ```
 docker pull andrewrech/cellseq-gpu:latest
