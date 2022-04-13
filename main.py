@@ -122,7 +122,7 @@ def main():
             
         print('Growing cells by', growth, 'pixels:', filename)
         
-        if cf.USE_GROWTH:
+        if cf.GROWTH_PIXELS > 0:
             print("Computing centroids and bounding boxes for the masks.")
             stitched_mask.compute_centroids()
             stitched_mask.compute_boundbox()
