@@ -17,7 +17,7 @@ class CVConfig():
     CHANNEL_PATH - (string) path to your channels file (usually named channelNames.txt). Only used for tif images with more than 3 channels, or 4D TIF images.
     NUCLEAR_CHANNEL_NAME - (string) name of nuclear stain (corresponding to channelNames.txt).  Case sensitive.  Only used for tif images with more than 3 channels, or 4D TIF images.
     GROWTH_PIXELS - (int) number of pixels from which to grow out from the nucleus to define a cell boundary.  Change based on tissue types (default value is 1).
-    USE_SEQUENTIAL_GROWTH - (True/False) choose how you want to grow masks, see docs for descriptions of each growth algorithm. Only used if GROWTH_PIXELS is nonzero. (default value is False)
+    GROWTH_METHOD - ('Standard'/'Sequential') - choose how you want to grow masks, see docs for descriptions of each growth algorithm. Only used if GROWTH_PIXELS is nonzero.
     
     OUTPUT_METHOD- how segmented data will be output, options are: (imagej_text_file, statistics, visual_image_output, visual_overlay_output, all), (default value is 'all')
     
@@ -50,7 +50,7 @@ class CVConfig():
     CHANNEL_PATH = os.path.join(target, 'channelNames.txt')
     NUCLEAR_CHANNEL_NAME = 'Insert name of nuclear channel to segment on'
     GROWTH_PIXELS = 0
-    USE_SEQUENTIAL_GROWTH = False
+    GROWTH_METHOD = 'Standard'
     OUTPUT_METHOD = 'all'
     BOOST = 'auto'
     AUTOBOOST_REFERENCE_IMAGE = 'Insert name of autoboost reference image' #ie 'cellimage1.tif'
