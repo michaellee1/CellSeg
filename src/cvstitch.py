@@ -80,9 +80,18 @@ class CVMaskStitcher():
         del mask_ids, mask_sizes
 
         h, w = masks[0].shape
-
-        strip_w = (w * 2) + (w + int(self.overlap / 2)) * (ncols - 2) - self.overlap * (ncols - 1)
-        strip_h = (h * 2) + (h + int(self.overlap / 2)) * (nrows - 2) - self.overlap * (nrows - 1)
+        
+        strip_w, strip_h = 0, 0
+        
+        if ncols == 1:
+            strip_w = w
+        else:
+            strip_w = (w * 2) + (w + int(self.overlap / 2)) * (ncols - 2) - self.overlap * (ncols - 1)
+        
+        if nrows == 1:
+            strip_h = h
+        else:
+            strip_h = (h * 2) + (h + int(self.overlap / 2)) * (nrows - 2) - self.overlap * (nrows - 1)
 
         nlayers = 4
 
