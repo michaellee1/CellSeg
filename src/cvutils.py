@@ -82,9 +82,13 @@ def meta_from_image(filename):
     if n_dims > 4 or n_dims < 2:
         raise ValueError('Invalid image dimensions.  CellVision supports 4D cycle, 3D, and 2D images.')
 
-    if n_dims == 4:
-        # Convert to 3D with channels in back
-        shape = (shape[2], shape[3], shape[0] * shape[1])
+        
+    if 'tif' in ext:
+        if n_dims == 4:
+            # Convert to 3D with channels in back
+            shape = (shape[2], shape[3], shape[0] * shape[1])
+        elif n_dims == 3:
+            shape = (shape[1], shape[2], shape[0])
     
     if n_dims == 2:
         shape = (shape[0], shape[1], 1)
@@ -978,3 +982,4 @@ def denorm_boxes(boxes, shape):
     scale = np.array([h - 1, w - 1, h - 1, w - 1])
     shift = np.array([0, 0, 1, 1])
     return np.around(np.multiply(boxes, scale) + shift).astype(np.int32)
+
