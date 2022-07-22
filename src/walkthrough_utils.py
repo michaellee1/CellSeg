@@ -12,11 +12,15 @@ import numpy as np
 
 def compute_boost(imagepath, read_method, is_codex_output, shape, n_dims, nuc_chan_name, chan_names, autoboost_perc = 99.98):
     image = np.array(read_method(imagepath))
-    if is_codex_output:
-        image = np.transpose(image, (2, 3, 0, 1))
+    ext = imagepath.split('.')[-1]
+    if 'tif' in ext:
+        if n_dims == 4:
+            image = np.transpose(image, (2, 3, 0, 1))
+        elif n_dims == 3:
+            image = np.transpose(image, (1, 2, 0))
     image = image.reshape(shape)
     nuclear_index = None
-    if n_dims == 4:
+    if 'tif' in ext:
         nuclear_index = cvutils.get_channel_index(nuc_chan_name, chan_names)
     nuclear_image = cvutils.get_nuclear_image(n_dims-1, image, nuclear_index=nuclear_index)
 
@@ -44,6 +48,7 @@ def compute_stats(grown_masks, cur_im_name, image, IS_CODEX_OUTPUT, CHANNEL_NAME
     centroids = grown_masks.centroids
     absolutes = grown_masks.absolute_centroids(tile_row, tile_col)
     semi_dataframe_comp = 1
+    semi_dataframe = 1
     if centroids:
         metadata_list = np.array([reg, tile_row, tile_col, tile_z])
         metadata = np.broadcast_to(
@@ -67,11 +72,14 @@ def compute_stats(grown_masks, cur_im_name, image, IS_CODEX_OUTPUT, CHANNEL_NAME
     ] 
 
     # Output to CSV
+    ext = cur_im_name.split('.')[-1]
     if not IS_CODEX_OUTPUT:
-        CHANNEL_NAMES = ['single-channel']
-        n_channels = image.shape[2]
-        if n_channels == 3:
-            CHANNEL_NAMES = ['Red', 'Green', 'Blue']
+        regname = cur_im_name.replace("." + cur_im_name.split(".")[-1], "")
+        if not 'tif' in ext:
+            CHANNEL_NAMES = ['single-channel']
+            n_channels = image.shape[2]
+            if n_channels == 3:
+                CHANNEL_NAMES = ['Red', 'Green', 'Blue']
     columns = descriptive_labels + [s for s in CHANNEL_NAMES]
     dataframe = pd.DataFrame()
     path = ''
