@@ -73,11 +73,16 @@ def main():
     if cf.BOOST == 'auto':
         path = os.path.join(cf.DIRECTORY_PATH, cf.AUTOBOOST_REFERENCE_IMAGE)
         image = np.array(cf.READ_METHOD(path))
-        if cf.IS_CODEX_OUTPUT:
-            image = np.transpose(image, (2, 3, 0, 1))
+        ext = path.split('.')[-1]
+        if 'tif' in ext:
+            if cf.N_DIMS == 4:
+                image = np.transpose(image, (2, 3, 0, 1))
+            elif cf.N_DIMS == 3:
+                image = np.transpose(image, (1, 2, 0))
+                
         image = image.reshape(cf.SHAPE)
         nuclear_index = None
-        if cf.N_DIMS == 4:
+        if 'tif' in ext:
             nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
         nuclear_image = cvutils.get_nuclear_image(cf.N_DIMS-1, image, nuclear_index=nuclear_index)
         print('Using auto boosting - may be inaccurate for empty or noisy images.')
@@ -92,11 +97,16 @@ def main():
 
         path = os.path.join(cf.DIRECTORY_PATH, filename)
         image = np.array(cf.READ_METHOD(path))
-        if cf.IS_CODEX_OUTPUT:
-            image = np.transpose(image, (2, 3, 0, 1))
+        ext = path.split('.')[-1]
+        if 'tif' in ext:
+            if cf.N_DIMS == 4:
+                image = np.transpose(image, (2, 3, 0, 1))
+            elif cf.N_DIMS == 3:
+                image = np.transpose(image, (1, 2, 0))
+                
         image = image.reshape(cf.SHAPE)
         nuclear_index = None
-        if cf.N_DIMS == 4:
+        if 'tif' in ext:
             nuclear_index = cvutils.get_channel_index(cf.NUCLEAR_CHANNEL_NAME, cf.CHANNEL_NAMES)
             
         nuclear_image = cvutils.get_nuclear_image(cf.N_DIMS-1, image, nuclear_index=nuclear_index)
@@ -122,10 +132,11 @@ def main():
             
         print('Growing cells by', growth, 'pixels:', filename)
         
+        print("Computing centroids and bounding boxes for the masks.")
+        stitched_mask.compute_centroids()
+        stitched_mask.compute_boundbox()
+        
         if cf.GROWTH_PIXELS > 0:
-            print("Computing centroids and bounding boxes for the masks.")
-            stitched_mask.compute_centroids()
-            stitched_mask.compute_boundbox()
             print(f"Growing masks by {cf.GROWTH_PIXELS} pixels")
             stitched_mask.grow_masks(cf.GROWTH_PIXELS, cf.GROWTH_METHOD)
         
@@ -162,7 +173,7 @@ def main():
             outlines = cvvisualize.generate_mask_outlines(stitched_mask.flatmasks)
             imsave(new_path, outlines)
 
-        if cf.OUTPUT_METHOD == 'statistics' or cf.OUTPUT_METHOD == 'all': #must rewrite this
+        if cf.OUTPUT_METHOD == 'statistics' or cf.OUTPUT_METHOD == 'all':
             print('Calculating statistics:', filename)
             reg, tile_row, tile_col, tile_z = 0, 1, 1, 0
             
@@ -180,6 +191,7 @@ def main():
             centroids = stitched_mask.centroids
             absolutes = stitched_mask.absolute_centroids(tile_row, tile_col)
             semi_dataframe_comp = 1
+            semi_dataframe = 1
             if centroids:
                 metadata_list = np.array([reg, tile_row, tile_col, tile_z])
                 metadata = np.broadcast_to(
@@ -203,11 +215,12 @@ def main():
             ] 
             # Output to CSV
             if not cf.IS_CODEX_OUTPUT:
-                cf.CHANNEL_NAMES = ['single-channel']
-                n_channels = cf.SHAPE[2]
-                if n_channels == 3:
-                    cf.CHANNEL_NAMES = ['Red', 'Green', 'Blue']
                 regname = filename.replace("." + filename.split(".")[-1], "")
+                if not 'tif' in ext:
+                    cf.CHANNEL_NAMES = ['single-channel']
+                    n_channels = cf.SHAPE[2]
+                    if n_channels == 3:
+                        cf.CHANNEL_NAMES = ['Red', 'Green', 'Blue']
                 
             columns = descriptive_labels + [s for s in cf.CHANNEL_NAMES]
             dataframe = None
@@ -253,3 +266,4 @@ def main():
     print("Segmentation Completed")
 if __name__ == "__main__":
     main()
+
