@@ -179,10 +179,8 @@ class CVMaskStitcher():
 
     # Remove any cells smaller than the defined threshold.
     def remove_small_cells(self, mask):
-        mask_id, sizes = np.unique(mask, return_counts = True)
-        keep_indices = list(sizes > self.threshold)
-        for currid, keep_id in zip(mask_id, keep_indices):
-            if not keep_id:
-                mask[mask == currid] = 0
-
-        return mask, list(sizes[keep_indices]), list(mask_id[keep_indices])
+        mask_id, sizes = np.unique(mask, return_counts=True)
+        keep_indices = sizes > self.threshold
+        keep_ids = mask_id[keep_indices]
+        mask[np.isin(mask, keep_ids, invert=True)] = 0
+        return mask, sizes[keep_indices].tolist(), keep_ids.tolist()
