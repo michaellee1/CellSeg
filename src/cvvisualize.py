@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from matplotlib import patches,  lines
 from matplotlib.patches import Polygon
 from matplotlib.ticker import NullLocator
-import IPython.display
+# import IPython.display
 from scipy.ndimage.morphology import binary_dilation, binary_erosion
 from skimage.morphology import disk
 

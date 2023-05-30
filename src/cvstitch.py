@@ -153,9 +153,9 @@ class CVMaskStitcher():
         expanded_mask_arr[masklocs] = 0
         full_mask_arr = np.sum(expanded_mask_arr, axis = 2)
         num_masks = len(np.unique(full_mask_arr)) - 1
-        print("Showing stitched masks")
-        plt.imshow(full_mask_arr > 0)
-        plt.show()
+        # print("Showing stitched masks")
+        # plt.imshow(full_mask_arr > 0)
+        # plt.show()
         #warn users if the number of masks discovered in the image will crash the program
         mask_arr_h, mask_arr_w = full_mask_arr.shape
         #expected_memory_gb = mask_arr_h * mask_arr_w * (num_masks + 1) / 1e9
