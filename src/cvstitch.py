@@ -10,6 +10,7 @@ from math import ceil
 import matplotlib.pyplot as plt
 import warnings
 import pandas as pd
+from skimage.measure import label
 
 class CVMaskStitcher():
     """
@@ -57,8 +58,8 @@ class CVMaskStitcher():
 
     def stitch_masks(self, masks, nrows, ncols):
         #if there was no cropping for segmentation, return the segmented image
-        if len(masks) == 1: 
-            return self.flat_to_expanded(masks[0])
+        # if len(masks) == 1: 
+        #     return self.flat_to_expanded(masks[0])
         
         assert(len(masks) == nrows * ncols)
         
